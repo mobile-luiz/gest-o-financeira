@@ -12,6 +12,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
+        /* --- ESTILOS ADICIONAIS PARA O LOGIN --- */
+        #loginOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #2c3e50; display: flex; justify-content: center;
+            align-items: center; z-index: 9999;
+        }
+        .login-card {
+            background: white; padding: 2.5rem; border-radius: 12px;
+            width: 90%; max-width: 380px; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .hidden { display: none !important; }
+
         /* Estilos mantidos conforme o seu original para preservar o visual */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
         body { display: flex; height: 100vh; background-color: #f4f4f9; overflow: hidden; }
@@ -64,11 +77,26 @@
 </head>
 <body>
 
+    <div id="loginOverlay">
+        <div class="login-card">
+            <i class="fas fa-user-shield" style="font-size: 3rem; color: #2c3e50; margin-bottom: 15px;"></i>
+            <h2>Acesso Restrito</h2>
+            <p style="margin-bottom: 20px; color: #666;">Faça login para continuar</p>
+            <form id="loginForm">
+                <div class="form-group"><input type="email" id="loginEmail" placeholder="E-mail" required></div>
+                <div class="form-group"><input type="password" id="loginSenha" placeholder="Senha" required></div>
+                <button type="submit" class="btn-save" id="btnLogin">Entrar</button>
+            </form>
+            <p id="loginStatus" style="margin-top: 15px; font-weight: bold;"></p>
+        </div>
+    </div>
+
     <nav class="sidebar">
         <h2>Minha Loja</h2>
         <button class="menu-btn active" onclick="showSection('novaVenda', this)"><i class="fas fa-plus-circle"></i> <span>Vender</span></button>
         <button class="menu-btn" onclick="showSection('lancamentos', this)"><i class="fas fa-list"></i> <span>Histórico</span></button>
         <button class="menu-btn" onclick="showSection('relatorios', this)"><i class="fas fa-chart-line"></i> <span>Relat.</span></button>
+        <button class="menu-btn" onclick="fazerLogout()" style="margin-top: auto; color: #e74c3c;"><i class="fas fa-sign-out-alt"></i> <span>Sair</span></button>
     </nav>
 
     <main class="main-content">
@@ -141,12 +169,46 @@
     </main>
 
 <script>
-    // ⚠️ SUBSTITUA PELA SUA URL DO NOVO DEPLOY (COM AS ALTERAÇÕES DE SEGURANÇA NO GS)
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxIE207MHibOmX_IL5N-nc8lZwjJA4f1_psh9VoGyjzE7LQOD-i1CxUxWtS8ff2SPaTng/exec';
+    // ⚠️ SUBSTITUA PELA SUA URL DO NOVO DEPLOY
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyOLFma-GDahlViTWdcjYpxcDbY6qffcoCa1yliNlv_26q_pog1yJQEWYiB6ufUUNLWbA/exec';
 
     let todosDados = [], dadosFiltradosHistorico = [];
     let paginaAtual = 1; const itensPorPagina = 10;
     let graficoVendas = null, graficoPagamento = null, graficoValorPagamento = null;
+
+    // --- LÓGICA DE LOGIN (ADICIONADA) ---
+    document.getElementById('loginForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const btn = document.getElementById('btnLogin');
+        const status = document.getElementById('loginStatus');
+        
+        const fd = new FormData();
+        fd.append('action', 'login');
+        fd.append('email', document.getElementById('loginEmail').value);
+        fd.append('senha', document.getElementById('loginSenha').value);
+
+        btn.disabled = true; btn.textContent = "Verificando...";
+
+        fetch(SCRIPT_URL, { method: 'POST', body: fd })
+        .then(res => res.json())
+        .then(res => {
+            if(res.status === 'sucesso') {
+                document.getElementById('loginOverlay').classList.add('hidden');
+                localStorage.setItem('loja_logado', 'true');
+                carregarDados();
+            } else {
+                status.textContent = res.message;
+                status.style.color = "red";
+            }
+        })
+        .catch(() => { status.textContent = "Erro na conexão."; })
+        .finally(() => { btn.disabled = false; btn.textContent = "Entrar"; });
+    });
+
+    function fazerLogout() {
+        localStorage.removeItem('loja_logado');
+        location.reload();
+    }
 
     // --- NAVEGAÇÃO ---
     function showSection(id, btn) {
@@ -155,7 +217,6 @@
         document.querySelectorAll('.menu-btn').forEach(el => el.classList.remove('active'));
         if(btn) btn.classList.add('active');
         
-        // Carrega dados automaticamente ao entrar em Histórico ou Relatórios
         if(id === 'lancamentos' || id === 'relatorios') carregarDados();
     }
 
@@ -165,15 +226,10 @@
         const btn = document.getElementById('btnSalvar');
         const status = document.getElementById('status');
         const isEdit = document.getElementById('editId').value !== "";
-        
-        // Prepara os dados do formulário
         const formData = new FormData(e.target);
-        
-        // Se não for edição, garantimos que a action enviada seja 'salvar' (ou vazio para o padrão do GS)
         if (!isEdit) formData.set('action', 'salvar');
 
-        btn.disabled = true; 
-        btn.textContent = "Processando...";
+        btn.disabled = true; btn.textContent = "Processando...";
         
         fetch(SCRIPT_URL, { method: 'POST', body: formData })
         .then(res => res.json())
@@ -182,16 +238,10 @@
                 status.textContent = "✅ " + response.message;
                 status.style.color = "green";
                 isEdit ? cancelarEdicao() : e.target.reset();
-                // Se estivermos vendo o histórico, atualiza a lista
                 if(document.getElementById('lancamentos').classList.contains('active')) carregarDados();
-            } else {
-                throw new Error(response.message);
-            }
+            } else { throw new Error(response.message); }
         })
-        .catch(err => { 
-            status.textContent = "❌ " + err.message; 
-            status.style.color = "red"; 
-        })
+        .catch(err => { status.textContent = "❌ " + err.message; status.style.color = "red"; })
         .finally(() => { 
             btn.disabled = false; 
             btn.textContent = isEdit ? "Atualizar" : "Confirmar Venda";
@@ -199,12 +249,10 @@
         });
     });
 
-    // --- CARREGAR DADOS (POST COM ACTION LISTAR) ---
-    // Agora o carregamento é via POST para manter o JSON privado
+    // --- CARREGAR DADOS ---
     function carregarDados() {
         const container = document.getElementById('tabelaContainer');
-        if(container) container.innerHTML = '<p style="text-align:center; padding:20px;"><i class="fas fa-spinner fa-spin"></i> Sincronizando dados protegidos...</p>';
-
+        if(container) container.innerHTML = '<p style="text-align:center; padding:20px;"><i class="fas fa-spinner fa-spin"></i> Sincronizando dados...</p>';
         const fd = new FormData();
         fd.append('action', 'listar');
 
@@ -212,26 +260,15 @@
         .then(res => res.json())
         .then(res => {
             if(res.status === 'sucesso') {
-                // Inverte para os mais novos ficarem no topo
                 todosDados = (res.data || []).slice().reverse(); 
                 dadosFiltradosHistorico = [...todosDados];
-                
-                paginaAtual = 1; 
-                renderizarPagina(); 
-                
-                // Atualiza Dashboard e Gráficos
-                gerarRelatorios(todosDados); 
-                gerarGraficos(todosDados);
-            } else {
-                throw new Error(res.message);
+                paginaAtual = 1; renderizarPagina(); 
+                gerarRelatorios(todosDados); gerarGraficos(todosDados);
             }
-        }).catch(err => {
-            console.error(err);
-            if(container) container.innerHTML = '<p style="color:red; text-align:center">Erro: Acesso negado ou falha de conexão.</p>';
         });
     }
 
-    // --- UTILITÁRIOS E RENDERIZAÇÃO ---
+    // --- RENDERIZAÇÃO E UTILITÁRIOS (MANTIDOS) ---
     function parseDataInteligente(dataStr) {
         if(!dataStr) return null;
         let d = new Date(dataStr);
@@ -260,12 +297,10 @@
         const container = document.getElementById('tabelaContainer');
         const controls = document.getElementById('paginationControls');
         const pageInfo = document.getElementById('pageInfo');
-        
         if(dadosFiltradosHistorico.length === 0) {
             container.innerHTML = '<p style="text-align:center; padding:20px;">Nenhum registro encontrado.</p>';
             controls.style.display = 'none'; return;
         }
-
         controls.style.display = 'flex';
         const inicio = (paginaAtual - 1) * itensPorPagina;
         const fim = inicio + itensPorPagina;
@@ -282,13 +317,12 @@
                 <td style="font-weight:bold">${parseFloat(item.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</td>
                 <td>${item.pagamento}</td>
                 <td>
-                    <button class="action-btn btn-edit" title="Editar" onclick="prepararEdicao('${item.id}', '${descSafe}', '${item.valor}', '${item.pagamento}')"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn btn-del" title="Excluir" onclick="excluirItem('${item.id}')"><i class="fas fa-trash-alt"></i></button>
+                    <button class="action-btn btn-edit" onclick="prepararEdicao('${item.id}', '${descSafe}', '${item.valor}', '${item.pagamento}')"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn btn-del" onclick="excluirItem('${item.id}')"><i class="fas fa-trash-alt"></i></button>
                 </td>
             </tr>`;
         });
-        html += '</tbody></table>'; 
-        container.innerHTML = html;
+        html += '</tbody></table>'; container.innerHTML = html;
     }
 
     function mudarPagina(d) {
@@ -296,7 +330,6 @@
         if(paginaAtual + d > 0 && paginaAtual + d <= total) { paginaAtual += d; renderizarPagina(); }
     }
 
-    // --- FILTROS ---
     function aplicarFiltroHistorico() {
         const i = document.getElementById('dataInicial').value;
         const f = document.getElementById('dataFinal').value;
@@ -333,7 +366,6 @@
         gerarRelatorios(todosDados); gerarGraficos(todosDados);
     }
 
-    // --- EDIÇÃO/EXCLUSÃO ---
     function prepararEdicao(id, d, v, p) {
         showSection('novaVenda');
         document.getElementById('editId').value = id;
@@ -354,26 +386,17 @@
     }
 
     function excluirItem(id) {
-        if(confirm("Deseja realmente apagar este registro?")) {
-            const fd = new FormData(); 
-            fd.append('action','excluir'); 
-            fd.append('id',id);
-            fetch(SCRIPT_URL, {method:'POST', body:fd})
-            .then(res => res.json())
-            .then(response => {
-                if(response.status === 'sucesso') carregarDados();
-                else alert("Erro: " + response.message);
-            });
+        if(confirm("Deseja realmente apagar?")) {
+            const fd = new FormData(); fd.append('action','excluir'); fd.append('id',id);
+            fetch(SCRIPT_URL, {method:'POST', body:fd}).then(() => carregarDados());
         }
     }
 
-    // --- DASHBOARD E GRÁFICOS ---
     function gerarRelatorios(dados) {
         const hojeStr = new Date().toLocaleDateString('pt-BR');
         const mesAtual = new Date().getMonth();
         const anoAtual = new Date().getFullYear();
         let sDia=0, sMes=0, sGeral=0;
-
         dados.forEach(i => {
             const v = parseFloat(i.valor); sGeral += v;
             const d = parseDataInteligente(i.data);
@@ -401,80 +424,44 @@
             porPag[p] = (porPag[p]||0) + 1;
             valorPag[p] = (valorPag[p]||0) + v;
         });
-
         const cores = ['#2ecc71', '#3498db', '#9b59b6', '#f1c40f', '#e74c3c'];
-
         if(graficoVendas) graficoVendas.destroy();
         graficoVendas = new Chart(document.getElementById('chartVendas'), {
             type: 'bar', data: { labels: Object.keys(porMes), datasets: [{ label: 'Vendas R$', data: Object.values(porMes), backgroundColor: '#3498db' }] }
         });
-        
         if(graficoPagamento) graficoPagamento.destroy();
         graficoPagamento = new Chart(document.getElementById('chartPagamento'), {
             type: 'doughnut', data: { labels: Object.keys(porPag), datasets: [{ data: Object.values(porPag), backgroundColor: cores }] }
         });
-        
         if(graficoValorPagamento) graficoValorPagamento.destroy();
         graficoValorPagamento = new Chart(document.getElementById('chartValorPagamento'), {
             type: 'bar', data: { labels: Object.keys(valorPag), datasets: [{ label: 'Total R$', data: Object.values(valorPag), backgroundColor: cores }] }
         });
     }
 
-
-   // --- EXPORTAÇÃO (APENAS PÁGINA ATUAL) ---
     function exportarExcel() {
-        // Calcula quais dados estão na tela agora
         const inicio = (paginaAtual - 1) * itensPorPagina;
-        const fim = inicio + itensPorPagina;
-        const dadosPagina = dadosFiltradosHistorico.slice(inicio, fim);
-
-        if (dadosPagina.length === 0) return alert("Não há dados na página para exportar");
-
-        const dadosExcel = dadosPagina.map(i => ({
-            Data: formatarDataVisual(i.data).replace(/<[^>]*>?/gm, ''), 
-            Descrição: i.descricao, 
-            Valor: parseFloat(i.valor), 
-            Pagamento: i.pagamento
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(dadosExcel);
+        const dadosPagina = dadosFiltradosHistorico.slice(inicio, inicio + itensPorPagina);
+        const ws = XLSX.utils.json_to_sheet(dadosPagina);
         const wb = XLSX.utils.book_new(); 
-        XLSX.utils.book_append_sheet(wb, ws, "Pagina_" + paginaAtual);
-        XLSX.writeFile(wb, `Vendas_Pagina_${paginaAtual}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "Vendas");
+        XLSX.writeFile(wb, `Vendas_Pg${paginaAtual}.xlsx`);
     }
 
     function exportarPDF() {
         const inicio = (paginaAtual - 1) * itensPorPagina;
-        const fim = inicio + itensPorPagina;
-        const dadosPagina = dadosFiltradosHistorico.slice(inicio, fim);
-
-        if (dadosPagina.length === 0) return alert("Não há dados na página para exportar");
-
+        const dadosPagina = dadosFiltradosHistorico.slice(inicio, inicio + itensPorPagina);
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-        
-        const dadosPdf = dadosPagina.map(i => [
-            formatarDataVisual(i.data).replace(/<[^>]*>?/gm, ''),
-            i.descricao,
-            parseFloat(i.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-            i.pagamento
-        ]);
-
-        doc.text(`Relatório de Vendas - Página ${paginaAtual}`, 14, 15);
-        doc.autoTable({ 
-            head: [['Data', 'Descrição', 'Valor', 'Pgto']], 
-            body: dadosPdf, 
-            startY: 20,
-            theme: 'striped'
-        });
-        
-        doc.save(`Vendas_Pagina_${paginaAtual}.pdf`);
+        const dadosPdf = dadosPagina.map(i => [i.data, i.descricao, i.valor, i.pagamento]);
+        doc.autoTable({ head: [['Data', 'Descrição', 'Valor', 'Pgto']], body: dadosPdf });
+        doc.save(`Vendas_Pg${paginaAtual}.pdf`);
     }
 
-    // Inicialização ao carregar a página
+    // VERIFICAÇÃO INICIAL
     window.onload = () => {
-        // Se a página começar no histórico ou dashboard, carrega os dados
-        if(!document.getElementById('novaVenda').classList.contains('active')) {
+        if(localStorage.getItem('loja_logado') === 'true') {
+            document.getElementById('loginOverlay').classList.add('hidden');
             carregarDados();
         }
     };
