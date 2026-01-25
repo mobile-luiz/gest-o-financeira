@@ -439,24 +439,68 @@
         });
     }
 
-    function exportarExcel() {
-        const inicio = (paginaAtual - 1) * itensPorPagina;
-        const dadosPagina = dadosFiltradosHistorico.slice(inicio, inicio + itensPorPagina);
-        const ws = XLSX.utils.json_to_sheet(dadosPagina);
-        const wb = XLSX.utils.book_new(); 
-        XLSX.utils.book_append_sheet(wb, ws, "Vendas");
-        XLSX.writeFile(wb, `Vendas_Pg${paginaAtual}.xlsx`);
-    }
+  function exportarExcel() {
+    // Seleciona os dados da página atual conforme sua lógica
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+    const dadosPagina = dadosFiltradosHistorico.slice(inicio, fim);
 
-    function exportarPDF() {
-        const inicio = (paginaAtual - 1) * itensPorPagina;
-        const dadosPagina = dadosFiltradosHistorico.slice(inicio, inicio + itensPorPagina);
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const dadosPdf = dadosPagina.map(i => [i.data, i.descricao, i.valor, i.pagamento]);
-        doc.autoTable({ head: [['Data', 'Descrição', 'Valor', 'Pgto']], body: dadosPdf });
-        doc.save(`Vendas_Pg${paginaAtual}.pdf`);
-    }
+    if (dadosPagina.length === 0) return alert("Não há dados na página para exportar");
+
+    // MAPEAMENTO: Tratando a data para o Excel
+    const dadosFormatados = dadosPagina.map(i => {
+        // Usa sua função formatarDataVisual para converter a string ISO em BR
+        // O replace remove o código HTML <small> da hora para o Excel ficar limpo
+        const dataLimpa = formatarDataVisual(i.data).replace(/<[^>]*>?/gm, '');
+        
+        return {
+            "Data": dataLimpa, // Ficará ex: 25/01/2026 19:14
+            "Descrição": i.descricao,
+            "Valor": parseFloat(i.valor),
+            "Pagamento": i.pagamento
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(dadosFormatados);
+    const wb = XLSX.utils.book_new(); 
+    XLSX.utils.book_append_sheet(wb, ws, "Vendas");
+    XLSX.writeFile(wb, `Vendas_Pagina_${paginaAtual}.xlsx`);
+}
+
+function exportarPDF() {
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+    const dadosPagina = dadosFiltradosHistorico.slice(inicio, fim);
+
+    if (dadosPagina.length === 0) return alert("Não há dados na página para exportar");
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Mapeia os dados tratando a data para o formato visual limpo
+    const dadosPdf = dadosPagina.map(i => [
+        // Converte a data ISO para o formato PT-BR e remove tags HTML
+        formatarDataVisual(i.data).replace(/<[^>]*>?/gm, ''),
+        i.descricao,
+        // Formata o valor como moeda brasileira para o documento
+        parseFloat(i.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        i.pagamento
+    ]);
+
+    // Título do Documento
+    doc.text(`Relatório de Vendas - Página ${paginaAtual}`, 14, 15);
+
+    // Gera a tabela no PDF
+    doc.autoTable({ 
+        head: [['Data', 'Descrição', 'Valor', 'Pgto']], 
+        body: dadosPdf, 
+        startY: 20,
+        theme: 'striped',
+        headStyles: { fillColor: [52, 73, 94] } // Cor combinando com sua Sidebar
+    });
+    
+    doc.save(`Vendas_Pagina_${paginaAtual}.pdf`);
+}
 
     // VERIFICAÇÃO INICIAL
     window.onload = () => {
