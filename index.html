@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minha Loja - Gestão</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* Estilos mantidos conforme o seu original para preservar o visual */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { display: flex; height: 100vh; background-color: #f4f4f9; overflow: hidden; }
+        .sidebar { width: 250px; background-color: #2c3e50; color: white; display: flex; flex-direction: column; padding: 1rem; flex-shrink: 0; z-index: 100; }
+        .sidebar h2 { text-align: center; margin-bottom: 2rem; font-size: 1.5rem; }
+        .menu-btn { background: none; border: none; color: #ecf0f1; padding: 15px; text-align: left; font-size: 1rem; cursor: pointer; border-radius: 5px; margin-bottom: 5px; transition: 0.3s; display: flex; align-items: center; gap: 10px; }
+        .menu-btn:hover, .menu-btn.active { background-color: #34495e; color: #2ecc71; }
+        .main-content { flex: 1; padding: 2rem; overflow-y: auto; height: 100%; }
+        .section { display: none; animation: fadeIn 0.3s; padding-bottom: 80px; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        h1 { margin-bottom: 1.5rem; color: #333; font-size: 1.8rem; }
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 500px; margin: 0 auto; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: #555; }
+        input, select { width: 100%; padding: 0.9rem; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; outline: none; }
+        button.btn-save { width: 100%; padding: 1rem; background-color: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1.1rem; margin-top: 0.5rem; font-weight: bold; }
+        button.btn-save:hover { background-color: #219150; }
+        #btnCancelar { background-color: #e74c3c; margin-top: 10px; display: none; }
+        .table-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .filter-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .btn-filter { padding: 8px 12px; background-color: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-clear { padding: 8px 12px; background-color: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-excel { background-color: #217346; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        .btn-pdf { background-color: #d40c0d; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        .table-responsive { width: 100%; overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; white-space: nowrap; }
+        th { background-color: #34495e; color: white; }
+        .action-btn { border: none; background: none; cursor: pointer; font-size: 1.1rem; margin: 0 5px; }
+        .btn-edit { color: #f39c12; } .btn-del { color: #e74c3c; }
+        .kpi-container { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .kpi-card { background: white; padding: 1.5rem; border-radius: 8px; flex: 1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; border-bottom: 4px solid transparent; }
+        .kpi-card:nth-child(1) { border-color: #3498db; } .kpi-card:nth-child(2) { border-color: #e67e22; } .kpi-card:nth-child(3) { border-color: #27ae60; }
+        .kpi-card p { font-size: 1.8rem; font-weight: 700; color: #2c3e50; margin-top: 5px; }
+        .charts-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 30px; }
+        .chart-box { flex: 1; min-width: 300px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { position: fixed; bottom: 0; left: 0; width: 100%; height: auto; flex-direction: row; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
+            .sidebar h2 { display: none; } 
+            .menu-btn { flex-direction: column; padding: 5px; font-size: 0.75rem; gap: 5px; } .menu-btn i { font-size: 1.4rem; }
+            .main-content { padding: 1rem; padding-bottom: 90px; }
+            .kpi-container { flex-direction: column; gap: 1rem; }
+            .kpi-card { display: flex; justify-content: space-between; align-items: center; padding: 1.2rem; }
+            .table-controls, .filter-group { flex-direction: column; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <h2>Minha Loja</h2>
+        <button class="menu-btn active" onclick="showSection('novaVenda', this)"><i class="fas fa-plus-circle"></i> <span>Vender</span></button>
+        <button class="menu-btn" onclick="showSection('lancamentos', this)"><i class="fas fa-list"></i> <span>Histórico</span></button>
+        <button class="menu-btn" onclick="showSection('relatorios', this)"><i class="fas fa-chart-line"></i> <span>Relat.</span></button>
+    </nav>
+
+    <main class="main-content">
+        
+        <div id="novaVenda" class="section active">
+            <h1 id="tituloForm" style="text-align: center;">Registrar Venda</h1>
+            <div class="card">
+                <form id="vendaForm">
+                    <input type="hidden" id="editId" name="id">
+                    <input type="hidden" id="formAction" name="action" value="">
+                    <div class="form-group"><label>Descrição</label><input type="text" id="descInput" name="descricao" required placeholder="Ex: Tênis Nike"></div>
+                    <div class="form-group"><label>Valor (R$)</label><input type="number" id="valorInput" name="valor" step="0.01" inputmode="decimal" required placeholder="0.00"></div>
+                    <div class="form-group"><label>Pagamento</label>
+                        <select id="pagInput" name="pagamento" required>
+                            <option value="">Selecione...</option>
+                            <option value="Pix">Pix</option>
+                            <option value="Cartão Crédito">Cartão Crédito</option>
+                            <option value="Cartão Débito">Cartão Débito</option>
+                            <option value="Dinheiro">Dinheiro</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-save" id="btnSalvar">Confirmar Venda</button>
+                    <button type="button" class="btn-save" id="btnCancelar" onclick="cancelarEdicao()">Cancelar Edição</button>
+                    <p id="status" style="text-align: center; margin-top: 15px; font-weight: bold;"></p>
+                </form>
+            </div>
+        </div>
+
+        <div id="lancamentos" class="section">
+            <h1>Histórico</h1>
+            <div class="table-controls">
+                <div class="filter-group">
+                    <input type="date" id="dataInicial"> <input type="date" id="dataFinal">
+                    <button class="btn-filter" onclick="aplicarFiltroHistorico()">Filtrar</button>
+                    <button class="btn-clear" onclick="limparFiltroHistorico()">Limpar</button>
+                </div>
+                <div class="export-group">
+                    <button class="btn-excel" title="Excel" onclick="exportarExcel()"><i class="fas fa-file-excel"></i></button>
+                    <button class="btn-pdf" title="PDF" onclick="exportarPDF()"><i class="fas fa-file-pdf"></i></button>
+                </div>
+                <div class="pagination-controls" id="paginationControls" style="display:none; gap:10px; align-items:center;">
+                    <button onclick="mudarPagina(-1)"><i class="fas fa-chevron-left"></i></button>
+                    <span id="pageInfo">1/1</span>
+                    <button onclick="mudarPagina(1)"><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
+            <div id="tabelaContainer" class="table-responsive"></div>
+        </div>
+
+        <div id="relatorios" class="section">
+            <h1>Dashboard</h1>
+            <div class="table-controls" style="justify-content: center; margin-bottom: 25px;">
+                <div class="filter-group">
+                    <label>Período:</label> <input type="date" id="dataInicialRel"> <input type="date" id="dataFinalRel">
+                    <button class="btn-filter" onclick="filtrarRelatorio()">Atualizar</button>
+                    <button class="btn-clear" onclick="limparFiltroRelatorio()">Tudo</button>
+                </div>
+            </div>
+            <div class="kpi-container">
+                <div class="kpi-card"><h3>Hoje</h3><p id="totalDia">R$ 0,00</p></div>
+                <div class="kpi-card"><h3>Mês</h3><p id="totalMes">R$ 0,00</p></div>
+                <div class="kpi-card"><h3>Total Período</h3><p id="totalGeral">R$ 0,00</p></div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-box"><h3>Vendas no Período</h3><canvas id="chartVendas"></canvas></div>
+                <div class="chart-box"><h3>Qtd. Pagamento</h3><canvas id="chartPagamento" style="max-height: 250px;"></canvas></div>
+                <div class="chart-box"><h3>Valor (R$) Pagamento</h3><canvas id="chartValorPagamento"></canvas></div>
+            </div>
+        </div>
+    </main>
+
+<script>
+    // ⚠️ SUBSTITUA PELA SUA URL DO NOVO DEPLOY (COM AS ALTERAÇÕES DE SEGURANÇA NO GS)
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxIE207MHibOmX_IL5N-nc8lZwjJA4f1_psh9VoGyjzE7LQOD-i1CxUxWtS8ff2SPaTng/exec';
+
+    let todosDados = [], dadosFiltradosHistorico = [];
+    let paginaAtual = 1; const itensPorPagina = 10;
+    let graficoVendas = null, graficoPagamento = null, graficoValorPagamento = null;
+
+    // --- NAVEGAÇÃO ---
+    function showSection(id, btn) {
+        document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.menu-btn').forEach(el => el.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        
+        // Carrega dados automaticamente ao entrar em Histórico ou Relatórios
+        if(id === 'lancamentos' || id === 'relatorios') carregarDados();
+    }
+
+    // --- ENVIAR/SALVAR (POST) ---
+    document.getElementById('vendaForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const btn = document.getElementById('btnSalvar');
+        const status = document.getElementById('status');
+        const isEdit = document.getElementById('editId').value !== "";
+        
+        // Prepara os dados do formulário
+        const formData = new FormData(e.target);
+        
+        // Se não for edição, garantimos que a action enviada seja 'salvar' (ou vazio para o padrão do GS)
+        if (!isEdit) formData.set('action', 'salvar');
+
+        btn.disabled = true; 
+        btn.textContent = "Processando...";
+        
+        fetch(SCRIPT_URL, { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(response => {
+            if(response.status === 'sucesso') {
+                status.textContent = "✅ " + response.message;
+                status.style.color = "green";
+                isEdit ? cancelarEdicao() : e.target.reset();
+                // Se estivermos vendo o histórico, atualiza a lista
+                if(document.getElementById('lancamentos').classList.contains('active')) carregarDados();
+            } else {
+                throw new Error(response.message);
+            }
+        })
+        .catch(err => { 
+            status.textContent = "❌ " + err.message; 
+            status.style.color = "red"; 
+        })
+        .finally(() => { 
+            btn.disabled = false; 
+            btn.textContent = isEdit ? "Atualizar" : "Confirmar Venda";
+            setTimeout(() => status.textContent = "", 3000); 
+        });
+    });
+
+    // --- CARREGAR DADOS (POST COM ACTION LISTAR) ---
+    // Agora o carregamento é via POST para manter o JSON privado
+    function carregarDados() {
+        const container = document.getElementById('tabelaContainer');
+        if(container) container.innerHTML = '<p style="text-align:center; padding:20px;"><i class="fas fa-spinner fa-spin"></i> Sincronizando dados protegidos...</p>';
+
+        const fd = new FormData();
+        fd.append('action', 'listar');
+
+        fetch(SCRIPT_URL, { method: 'POST', body: fd })
+        .then(res => res.json())
+        .then(res => {
+            if(res.status === 'sucesso') {
+                // Inverte para os mais novos ficarem no topo
+                todosDados = (res.data || []).slice().reverse(); 
+                dadosFiltradosHistorico = [...todosDados];
+                
+                paginaAtual = 1; 
+                renderizarPagina(); 
+                
+                // Atualiza Dashboard e Gráficos
+                gerarRelatorios(todosDados); 
+                gerarGraficos(todosDados);
+            } else {
+                throw new Error(res.message);
+            }
+        }).catch(err => {
+            console.error(err);
+            if(container) container.innerHTML = '<p style="color:red; text-align:center">Erro: Acesso negado ou falha de conexão.</p>';
+        });
+    }
+
+    // --- UTILITÁRIOS E RENDERIZAÇÃO ---
+    function parseDataInteligente(dataStr) {
+        if(!dataStr) return null;
+        let d = new Date(dataStr);
+        if(!isNaN(d.getTime())) return d;
+        try {
+            let partes = dataStr.split(' ');
+            let dataParts = partes[0].split('/');
+            if(dataParts.length === 3) return new Date(dataParts[2], dataParts[1]-1, dataParts[0]);
+        } catch(e) {}
+        return null;
+    }
+
+    function formatarDataVisual(dataStr) {
+        if (!dataStr) return "---";
+        const d = parseDataInteligente(dataStr);
+        if(!d) return dataStr;
+        const dia = String(d.getDate()).padStart(2,'0');
+        const mes = String(d.getMonth()+1).padStart(2,'0');
+        const ano = d.getFullYear();
+        const hora = String(d.getHours()).padStart(2,'0');
+        const min = String(d.getMinutes()).padStart(2,'0');
+        return `${dia}/${mes}/${ano} <small style="color:#888">${hora}:${min}</small>`;
+    }
+
+    function renderizarPagina() {
+        const container = document.getElementById('tabelaContainer');
+        const controls = document.getElementById('paginationControls');
+        const pageInfo = document.getElementById('pageInfo');
+        
+        if(dadosFiltradosHistorico.length === 0) {
+            container.innerHTML = '<p style="text-align:center; padding:20px;">Nenhum registro encontrado.</p>';
+            controls.style.display = 'none'; return;
+        }
+
+        controls.style.display = 'flex';
+        const inicio = (paginaAtual - 1) * itensPorPagina;
+        const fim = inicio + itensPorPagina;
+        const pagData = dadosFiltradosHistorico.slice(inicio, fim);
+        const totalPags = Math.ceil(dadosFiltradosHistorico.length / itensPorPagina);
+        pageInfo.innerText = `${paginaAtual}/${totalPags}`;
+
+        let html = `<table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>`;
+        pagData.forEach(item => {
+            let descSafe = item.descricao.replace(/'/g, "\\'");
+            html += `<tr>
+                <td>${formatarDataVisual(item.data)}</td>
+                <td>${item.descricao}</td>
+                <td style="font-weight:bold">${parseFloat(item.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</td>
+                <td>${item.pagamento}</td>
+                <td>
+                    <button class="action-btn btn-edit" title="Editar" onclick="prepararEdicao('${item.id}', '${descSafe}', '${item.valor}', '${item.pagamento}')"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn btn-del" title="Excluir" onclick="excluirItem('${item.id}')"><i class="fas fa-trash-alt"></i></button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>'; 
+        container.innerHTML = html;
+    }
+
+    function mudarPagina(d) {
+        const total = Math.ceil(dadosFiltradosHistorico.length / itensPorPagina);
+        if(paginaAtual + d > 0 && paginaAtual + d <= total) { paginaAtual += d; renderizarPagina(); }
+    }
+
+    // --- FILTROS ---
+    function aplicarFiltroHistorico() {
+        const i = document.getElementById('dataInicial').value;
+        const f = document.getElementById('dataFinal').value;
+        if(!i || !f) return alert("Selecione data inicial e final");
+        const dI = new Date(i + "T00:00:00");
+        const dF = new Date(f + "T23:59:59");
+        dadosFiltradosHistorico = todosDados.filter(item => {
+            const d = parseDataInteligente(item.data);
+            return d && d >= dI && d <= dF;
+        });
+        paginaAtual = 1; renderizarPagina();
+    }
+    
+    function limparFiltroHistorico() {
+        document.getElementById('dataInicial').value = ""; document.getElementById('dataFinal').value = "";
+        dadosFiltradosHistorico = [...todosDados]; paginaAtual = 1; renderizarPagina();
+    }
+
+    function filtrarRelatorio() {
+        const i = document.getElementById('dataInicialRel').value;
+        const f = document.getElementById('dataFinalRel').value;
+        if(!i || !f) return alert("Selecione o período");
+        const dI = new Date(i + "T00:00:00");
+        const dF = new Date(f + "T23:59:59");
+        const filtrados = todosDados.filter(item => {
+            const d = parseDataInteligente(item.data);
+            return d && d >= dI && d <= dF;
+        });
+        gerarRelatorios(filtrados); gerarGraficos(filtrados);
+    }
+
+    function limparFiltroRelatorio() {
+        document.getElementById('dataInicialRel').value = ""; document.getElementById('dataFinalRel').value = "";
+        gerarRelatorios(todosDados); gerarGraficos(todosDados);
+    }
+
+    // --- EDIÇÃO/EXCLUSÃO ---
+    function prepararEdicao(id, d, v, p) {
+        showSection('novaVenda');
+        document.getElementById('editId').value = id;
+        document.getElementById('descInput').value = d;
+        document.getElementById('valorInput').value = v;
+        document.getElementById('pagInput').value = p;
+        document.getElementById('tituloForm').innerText = "Editar Venda";
+        document.getElementById('btnSalvar').innerText = "Atualizar";
+        document.getElementById('btnCancelar').style.display = "block";
+    }
+
+    function cancelarEdicao() {
+        document.getElementById('vendaForm').reset();
+        document.getElementById('editId').value = "";
+        document.getElementById('tituloForm').innerText = "Registrar Venda";
+        document.getElementById('btnSalvar').innerText = "Confirmar Venda";
+        document.getElementById('btnCancelar').style.display = "none";
+    }
+
+    function excluirItem(id) {
+        if(confirm("Deseja realmente apagar este registro?")) {
+            const fd = new FormData(); 
+            fd.append('action','excluir'); 
+            fd.append('id',id);
+            fetch(SCRIPT_URL, {method:'POST', body:fd})
+            .then(res => res.json())
+            .then(response => {
+                if(response.status === 'sucesso') carregarDados();
+                else alert("Erro: " + response.message);
+            });
+        }
+    }
+
+    // --- DASHBOARD E GRÁFICOS ---
+    function gerarRelatorios(dados) {
+        const hojeStr = new Date().toLocaleDateString('pt-BR');
+        const mesAtual = new Date().getMonth();
+        const anoAtual = new Date().getFullYear();
+        let sDia=0, sMes=0, sGeral=0;
+
+        dados.forEach(i => {
+            const v = parseFloat(i.valor); sGeral += v;
+            const d = parseDataInteligente(i.data);
+            if(d) {
+                if(d.toLocaleDateString('pt-BR') === hojeStr) sDia += v;
+                if(d.getMonth() === mesAtual && d.getFullYear() === anoAtual) sMes += v;
+            }
+        });
+        const fmt = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+        document.getElementById('totalDia').textContent = fmt(sDia);
+        document.getElementById('totalMes').textContent = fmt(sMes);
+        document.getElementById('totalGeral').textContent = fmt(sGeral);
+    }
+
+    function gerarGraficos(dados) {
+        const porMes = {}, porPag = {}, valorPag = {};
+        dados.forEach(i => {
+            const d = parseDataInteligente(i.data);
+            const v = parseFloat(i.valor);
+            const p = i.pagamento || "Outro";
+            if(d) {
+                const k = `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+                porMes[k] = (porMes[k]||0) + v;
+            }
+            porPag[p] = (porPag[p]||0) + 1;
+            valorPag[p] = (valorPag[p]||0) + v;
+        });
+
+        const cores = ['#2ecc71', '#3498db', '#9b59b6', '#f1c40f', '#e74c3c'];
+
+        if(graficoVendas) graficoVendas.destroy();
+        graficoVendas = new Chart(document.getElementById('chartVendas'), {
+            type: 'bar', data: { labels: Object.keys(porMes), datasets: [{ label: 'Vendas R$', data: Object.values(porMes), backgroundColor: '#3498db' }] }
+        });
+        
+        if(graficoPagamento) graficoPagamento.destroy();
+        graficoPagamento = new Chart(document.getElementById('chartPagamento'), {
+            type: 'doughnut', data: { labels: Object.keys(porPag), datasets: [{ data: Object.values(porPag), backgroundColor: cores }] }
+        });
+        
+        if(graficoValorPagamento) graficoValorPagamento.destroy();
+        graficoValorPagamento = new Chart(document.getElementById('chartValorPagamento'), {
+            type: 'bar', data: { labels: Object.keys(valorPag), datasets: [{ label: 'Total R$', data: Object.values(valorPag), backgroundColor: cores }] }
+        });
+    }
+
+
+   // --- EXPORTAÇÃO (APENAS PÁGINA ATUAL) ---
+    function exportarExcel() {
+        // Calcula quais dados estão na tela agora
+        const inicio = (paginaAtual - 1) * itensPorPagina;
+        const fim = inicio + itensPorPagina;
+        const dadosPagina = dadosFiltradosHistorico.slice(inicio, fim);
+
+        if (dadosPagina.length === 0) return alert("Não há dados na página para exportar");
+
+        const dadosExcel = dadosPagina.map(i => ({
+            Data: formatarDataVisual(i.data).replace(/<[^>]*>?/gm, ''), 
+            Descrição: i.descricao, 
+            Valor: parseFloat(i.valor), 
+            Pagamento: i.pagamento
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dadosExcel);
+        const wb = XLSX.utils.book_new(); 
+        XLSX.utils.book_append_sheet(wb, ws, "Pagina_" + paginaAtual);
+        XLSX.writeFile(wb, `Vendas_Pagina_${paginaAtual}.xlsx`);
+    }
+
+    function exportarPDF() {
+        const inicio = (paginaAtual - 1) * itensPorPagina;
+        const fim = inicio + itensPorPagina;
+        const dadosPagina = dadosFiltradosHistorico.slice(inicio, fim);
+
+        if (dadosPagina.length === 0) return alert("Não há dados na página para exportar");
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        const dadosPdf = dadosPagina.map(i => [
+            formatarDataVisual(i.data).replace(/<[^>]*>?/gm, ''),
+            i.descricao,
+            parseFloat(i.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            i.pagamento
+        ]);
+
+        doc.text(`Relatório de Vendas - Página ${paginaAtual}`, 14, 15);
+        doc.autoTable({ 
+            head: [['Data', 'Descrição', 'Valor', 'Pgto']], 
+            body: dadosPdf, 
+            startY: 20,
+            theme: 'striped'
+        });
+        
+        doc.save(`Vendas_Pagina_${paginaAtual}.pdf`);
+    }
+
+    // Inicialização ao carregar a página
+    window.onload = () => {
+        // Se a página começar no histórico ou dashboard, carrega os dados
+        if(!document.getElementById('novaVenda').classList.contains('active')) {
+            carregarDados();
+        }
+    };
+</script>
+</body>
+</html>
