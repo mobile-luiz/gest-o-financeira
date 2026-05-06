@@ -3,22 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sistema de Gestão</title>
+    <title>Sistema de Gestão - Cortetons</title>
     
+    <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- XLSX para exportação Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <!-- Chart.js para gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
+    <!-- CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- TELA DE LOGIN -->
+    <!-- ==================== TELA DE LOGIN ==================== -->
     <div id="loginOverlay">
         <div class="login-container">
-            <div class="login-card floating">
+            <div class="login-card">
                 <div class="logo">
                     <i class="fas fa-chart-line"></i>
                 </div>
@@ -28,7 +32,7 @@
                 <form id="loginForm">
                     <div class="input-group">
                         <i class="fas fa-envelope"></i>
-                        <input type="email" id="loginEmail" placeholder="E-mail" required autocomplete="username">
+                        <input type="email" id="loginEmail" placeholder="E-mail" required autocomplete="email">
                     </div>
                     <div class="input-group">
                         <i class="fas fa-lock"></i>
@@ -38,12 +42,12 @@
                         <i class="fas fa-sign-in-alt"></i> Entrar
                     </button>
                 </form>
-                <p id="loginStatus" class="status-message"></p>
+                <div id="loginStatus" class="status-message"></div>
             </div>
         </div>
     </div>
 
-    <!-- SIDEBAR -->
+    <!-- ==================== SIDEBAR ==================== -->
     <nav class="sidebar">
         <div class="brand">
             <i class="fas fa-chart-line"></i>
@@ -52,58 +56,62 @@
         
         <div class="user-info" id="userInfo">
             <div class="user-avatar">
-                <i class="fas fa-user"></i>
+                <i class="fas fa-user-circle"></i>
             </div>
             <p class="user-email" id="userEmail"></p>
         </div>
         
         <div class="nav-menu">
-            <button class="menu-btn active" onclick="showSection('novaVenda', this, true)">
+            <button class="menu-btn active" data-section="novaVenda">
                 <i class="fas fa-cash-register"></i>
                 <span>Nova Venda</span>
             </button>
-            <button class="menu-btn" onclick="showSection('lancamentos', this, true)">
+            <button class="menu-btn" data-section="lancamentos">
                 <i class="fas fa-history"></i>
                 <span>Histórico</span>
             </button>
-            <button class="menu-btn" onclick="showSection('relatorios', this, true)">
+            <button class="menu-btn" data-section="relatorios">
                 <i class="fas fa-chart-bar"></i>
                 <span>Relatórios</span>
             </button>
+            <button class="menu-btn" data-section="despesas">
+                <i class="fas fa-receipt"></i>
+                <span>Despesas</span>
+            </button>
         </div>
         
-        <button class="menu-btn logout-btn" onclick="fazerLogout()">
+        <button class="menu-btn logout-btn" id="logoutBtn">
             <i class="fas fa-sign-out-alt"></i>
             <span>Sair</span>
         </button>
     </nav>
 
-    <!-- FOOTER MOBILE -->
+    <!-- ==================== FOOTER MOBILE ==================== -->
     <footer class="mobile-footer" id="mobileFooter">
         <div class="mobile-nav">
-            <button class="mobile-nav-btn active" onclick="showSection('novaVenda', this, false)">
+            <button class="mobile-nav-btn active" data-section="novaVenda">
                 <i class="fas fa-cash-register"></i>
                 <span>Vender</span>
             </button>
-            <button class="mobile-nav-btn" onclick="showSection('lancamentos', this, false)">
+            <button class="mobile-nav-btn" data-section="lancamentos">
                 <i class="fas fa-history"></i>
-                <span>Histórico</span>
+                <span>Hist.</span>
             </button>
-            <button class="mobile-nav-btn" onclick="showSection('relatorios', this, false)">
+            <button class="mobile-nav-btn" data-section="relatorios">
                 <i class="fas fa-chart-bar"></i>
-                <span>Relat.</span>
+                <span>Rel.</span>
             </button>
-            <button class="mobile-nav-btn" onclick="fazerLogout()">
-                <i class="fas fa-sign-out-alt"></i>
-                <span>Sair</span>
+            <button class="mobile-nav-btn" data-section="despesas">
+                <i class="fas fa-receipt"></i>
+                <span>Desp.</span>
             </button>
         </div>
     </footer>
 
-    <!-- CONTEÚDO PRINCIPAL -->
+    <!-- ==================== CONTEÚDO PRINCIPAL ==================== -->
     <main class="main-content">
         
-        <!-- SEÇÃO: NOVA VENDA -->
+        <!-- ==================== SEÇÃO: NOVA VENDA ==================== -->
         <div id="novaVenda" class="section active">
             <div class="page-header">
                 <h1><i class="fas fa-cash-register"></i> Nova Venda</h1>
@@ -112,41 +120,36 @@
             
             <div class="card">
                 <form id="vendaForm">
-                    <input type="hidden" id="editId" name="id">
+                    <input type="hidden" id="editId">
                     
                     <div class="form-group">
-                        <label for="descInput"><i class="fas fa-tag"></i> Descrição</label>
-                        <input type="text" id="descInput" name="descricao" class="form-control" 
-                               required placeholder="Ex: Tênis Nike Air Max">
+                        <label><i class="fas fa-tag"></i> Descrição do Produto/Serviço</label>
+                        <input type="text" id="descInput" class="form-control" required placeholder="Ex: Corte de cabelo">
                     </div>
                     
-                    <!-- Linha com Valor e Desconto lado a lado -->
                     <div class="form-row">
                         <div class="form-col">
                             <div class="form-group">
-                                <label for="valorInput"><i class="fas fa-money-bill-wave"></i> Valor (R$)</label>
-                                <input type="number" id="valorInput" name="valor" class="form-control" 
-                                       step="0.01" required placeholder="0.00" min="0" value="0">
+                                <label><i class="fas fa-money-bill-wave"></i> Valor (R$)</label>
+                                <input type="number" id="valorInput" class="form-control" step="0.01" required placeholder="0,00" min="0" value="0">
                             </div>
                         </div>
                         <div class="form-col">
                             <div class="form-group">
-                                <label for="descontoInput"><i class="fas fa-percentage"></i> Desconto (R$)</label>
-                                <input type="number" id="descontoInput" name="desconto" class="form-control" 
-                                       step="0.01" placeholder="0.00" min="0" value="0">
+                                <label><i class="fas fa-percentage"></i> Desconto (R$)</label>
+                                <input type="number" id="descontoInput" class="form-control" step="0.01" placeholder="0,00" min="0" value="0">
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Display do valor final calculado -->
                     <div class="valor-display">
                         <h4>VALOR FINAL</h4>
                         <p id="valorFinalDisplay">R$ 0,00</p>
                     </div>
                     
                     <div class="form-group">
-                        <label for="pagInput"><i class="fas fa-credit-card"></i> Forma de Pagamento</label>
-                        <select id="pagInput" name="pagamento" class="form-control" required>
+                        <label><i class="fas fa-credit-card"></i> Forma de Pagamento</label>
+                        <select id="pagInput" class="form-control" required>
                             <option value="">Selecione...</option>
                             <option value="Dinheiro">Dinheiro</option>
                             <option value="Pix">Pix</option>
@@ -160,107 +163,164 @@
                         <i class="fas fa-check-circle"></i> Confirmar Venda
                     </button>
                     
-                    <button type="button" class="btn btn-danger btn-block" id="btnCancelar" onclick="cancelarEdicao()">
+                    <button type="button" class="btn btn-secondary btn-block" id="btnCancelar" style="display: none;">
                         <i class="fas fa-times-circle"></i> Cancelar Edição
                     </button>
                     
-                    <p id="status" class="status-message"></p>
+                    <div id="status" class="status-message"></div>
                 </form>
             </div>
         </div>
 
-        <!-- SEÇÃO: HISTÓRICO -->
+        <!-- ==================== SEÇÃO: HISTÓRICO DE VENDAS ==================== -->
         <div id="lancamentos" class="section">
             <div class="page-header">
                 <h1><i class="fas fa-history"></i> Histórico de Vendas</h1>
-                <div class="date-indicator" id="filterDate"></div>
+                <div class="date-indicator" id="filterDate">Todos os registros</div>
             </div>
             
-            <div class="table-container">
-                <div class="table-header">
-                    <div class="filters">
-                        <input type="date" id="dataInicial" class="filter-input">
-                        <input type="date" id="dataFinal" class="filter-input">
-                        <button class="btn btn-primary btn-icon" onclick="aplicarFiltroHistorico()">
-                            <i class="fas fa-filter"></i>
+            <div class="card-table">
+                <!-- Toolbar -->
+                <div class="table-toolbar">
+                    <div class="filters-group">
+                        <div class="filter-item">
+                            <i class="fas fa-calendar-alt"></i>
+                            <input type="date" id="dataInicial" class="filter-input" placeholder="Data inicial">
+                        </div>
+                        <div class="filter-item">
+                            <i class="fas fa-calendar-check"></i>
+                            <input type="date" id="dataFinal" class="filter-input" placeholder="Data final">
+                        </div>
+                        <div class="filter-item">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="buscaInput" class="filter-input" placeholder="Buscar descrição...">
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btnFiltrar">
+                            <i class="fas fa-filter"></i> Filtrar
                         </button>
-                        <button class="btn btn-icon" onclick="limparFiltroHistorico()" style="background: var(--gray-light);">
-                            <i class="fas fa-eraser"></i>
+                        <button class="btn btn-secondary btn-sm" id="btnLimparFiltro">
+                            <i class="fas fa-undo-alt"></i> Limpar
                         </button>
                     </div>
                     
-                    <div class="export-buttons">
-                        <button class="btn btn-success btn-icon" title="Exportar Excel" onclick="exportarExcel()">
-                            <i class="fas fa-file-excel"></i>
+                    <div class="export-group">
+                        <button class="btn btn-success btn-sm" id="btnExportarExcel" title="Exportar Excel">
+                            <i class="fas fa-file-excel"></i> Excel
                         </button>
-                        <button class="btn btn-danger btn-icon" title="Exportar PDF" onclick="exportarPDF()">
-                            <i class="fas fa-file-pdf"></i>
+                        <button class="btn btn-danger btn-sm" id="btnExportarPDF" title="Exportar PDF">
+                            <i class="fas fa-file-pdf"></i> PDF
                         </button>
                     </div>
                 </div>
                 
-                <div id="tabelaContainer" class="table-responsive"></div>
+                <!-- Tabela -->
+                <div class="table-wrapper">
+                    <table class="table-modern" id="tabelaHistorico">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Descrição</th>
+                                <th>Valor Bruto</th>
+                                <th>Desconto</th>
+                                <th>Valor Líquido</th>
+                                <th>Pagamento</th>
+                                <th>Vendedor</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaContainer">
+                            <!-- Preenchido via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
                 
-                <div class="pagination" id="paginationControls" style="display: none; padding: 1.5rem;">
-                    <button class="page-btn" onclick="mudarPagina(-1)">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <span id="pageInfo" style="font-weight: 600; color: var(--dark);">1/1</span>
-                    <button class="page-btn" onclick="mudarPagina(1)">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
+                <!-- Footer -->
+                <div class="table-footer">
+                    <div class="pagination-modern">
+                        <button class="page-btn" id="btnPaginaAnterior">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span class="page-info">
+                            Página <span id="pageInfo">1</span> de <span id="totalPaginas">1</span>
+                        </span>
+                        <button class="page-btn" id="btnPaginaProxima">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="table-info">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Total de registros: <strong id="totalRegistros">0</strong></span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- SEÇÃO: RELATÓRIOS -->
+        <!-- ==================== SEÇÃO: RELATÓRIOS ==================== -->
         <div id="relatorios" class="section">
             <div class="page-header">
                 <h1><i class="fas fa-chart-bar"></i> Dashboard</h1>
-                <div class="date-indicator" id="reportDate"></div>
+                <div class="date-indicator" id="reportDate">Período atual</div>
             </div>
             
-            <div class="table-container" style="margin-bottom: 2rem;">
-                <div class="table-header">
-                    <div class="filters">
-                        <label style="color: white;">Período:</label>
-                        <input type="date" id="dataInicialRel" class="filter-input">
-                        <input type="date" id="dataFinalRel" class="filter-input">
-                        <button class="btn btn-primary" onclick="filtrarRelatorio()">
-                            <i class="fas fa-sync-alt"></i> Atualizar
-                        </button>
-                        <button class="btn" onclick="limparFiltroRelatorio()" style="background: var(--gray-light);">
-                            <i class="fas fa-list"></i> Tudo
-                        </button>
-                    </div>
+            <!-- Filtros -->
+            <div class="filters-bar">
+                <div class="filters">
+                    <label><i class="fas fa-calendar-alt"></i> Período:</label>
+                    <input type="date" id="dataInicialRel">
+                    <input type="date" id="dataFinalRel">
+                    <button class="btn btn-primary btn-sm" id="btnFiltrarRelatorio">
+                        <i class="fas fa-sync-alt"></i> Atualizar
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btnLimparRelatorio">
+                        <i class="fas fa-list"></i> Tudo
+                    </button>
+                </div>
+            </div>
+            
+            <!-- KPIs -->
+            <div class="kpi-container">
+                <div class="kpi-card">
+                    <h3><i class="fas fa-calendar-day"></i> Vendas Hoje (Líquido)</h3>
+                    <p id="totalDia">R$ 0,00</p>
+                    <small id="descontoDia">Descontos: R$ 0,00</small>
+                </div>
+                <div class="kpi-card">
+                    <h3><i class="fas fa-calendar-week"></i> Vendas do Mês (Líquido)</h3>
+                    <p id="totalMes">R$ 0,00</p>
+                    <small id="descontoMes">Descontos: R$ 0,00</small>
+                </div>
+                <div class="kpi-card">
+                    <h3><i class="fas fa-chart-line"></i> Total Geral (Líquido)</h3>
+                    <p id="totalGeral">R$ 0,00</p>
+                    <small id="descontoGeral">Descontos: R$ 0,00</small>
                 </div>
             </div>
             
             <div class="kpi-container">
                 <div class="kpi-card">
-                    <h3>Vendas Hoje (Líquido)</h3>
-                    <p id="totalDia">R$ 0,00 <br><small><i class="fas fa-shopping-cart"></i> 0 venda(s)</small></p>
-                    <small id="descontoDia" style="color: var(--danger);">Descontos: R$ 0,00</small>
+                    <h3><i class="fas fa-receipt"></i> Despesas do Mês</h3>
+                    <p id="despesaMes">R$ 0,00</p>
+                    <small>Total de despesas</small>
                 </div>
                 <div class="kpi-card">
-                    <h3>Vendas do Mês (Líquido)</h3>
-                    <p id="totalMes">R$ 0,00 <br><small><i class="fas fa-shopping-cart"></i> 0 venda(s)</small></p>
-                    <small id="descontoMes" style="color: var(--danger);">Descontos: R$ 0,00</small>
+                    <h3><i class="fas fa-coins"></i> Lucro do Mês</h3>
+                    <p id="lucroMes">R$ 0,00</p>
+                    <small id="lucroStatus">💰 Lucro</small>
                 </div>
                 <div class="kpi-card">
-                    <h3>Total Geral (Líquido)</h3>
-                    <p id="totalGeral">R$ 0,00 <br><small><i class="fas fa-shopping-cart"></i> 0 venda(s)</small></p>
-                    <small id="descontoGeral" style="color: var(--danger);">Descontos: R$ 0,00</small>
+                    <h3><i class="fas fa-piggy-bank"></i> Lucro Total Geral</h3>
+                    <p id="lucroGeral">R$ 0,00</p>
                 </div>
             </div>
             
+            <!-- Gráficos -->
             <div class="charts-grid">
                 <div class="chart-card">
                     <h3><i class="fas fa-chart-line"></i> Vendas Líquidas no Período</h3>
                     <canvas id="chartVendas"></canvas>
                 </div>
                 <div class="chart-card">
-                    <h3><i class="fas fa-credit-card"></i> Métodos de Pagamento</h3>
+                    <h3><i class="fas fa-credit-card"></i> Formas de Pagamento</h3>
                     <canvas id="chartPagamento"></canvas>
                 </div>
                 <div class="chart-card">
@@ -268,13 +328,203 @@
                     <canvas id="chartDescontos"></canvas>
                 </div>
                 <div class="chart-card">
-                    <h3><i class="fas fa-money-bill-wave"></i> Valor por Método de Pagamento</h3>
-                    <canvas id="chartValorPagamento"></canvas>
+                    <h3><i class="fas fa-chart-pie"></i> Despesas vs Lucro (Mês)</h3>
+                    <canvas id="chartDespesasLucro"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3><i class="fas fa-chart-line"></i> Despesas por Mês</h3>
+                    <canvas id="chartDespesasMes"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SEÇÃO: DESPESAS ==================== -->
+        <div id="despesas" class="section">
+            <div class="page-header">
+                <h1><i class="fas fa-receipt"></i> Gestão de Despesas</h1>
+                <div class="date-indicator" id="filterDespesaDate">Todas as despesas</div>
+            </div>
+            
+            <!-- Formulário de Despesa -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <h3 style="margin-bottom: 1.5rem; color: var(--dark);">
+                    <i class="fas fa-plus-circle"></i> Nova Despesa
+                </h3>
+                <form id="despesaForm">
+                    <input type="hidden" id="editDespesaId">
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label><i class="fas fa-tags"></i> Categoria</label>
+                                <select id="categoriaInput" class="form-control" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="Aluguel">Aluguel</option>
+                                    <option value="Salários">Salários</option>
+                                    <option value="Água">Água</option>
+                                    <option value="Luz">Luz</option>
+                                    <option value="Internet">Internet</option>
+                                    <option value="Telefone">Telefone</option>
+                                    <option value="Material">Material/Estoque</option>
+                                    <option value="Manutenção">Manutenção</option>
+                                    <option value="Impostos">Impostos</option>
+                                    <option value="Marketing">Marketing</option>
+                                    <option value="Transporte">Transporte</option>
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label><i class="fas fa-money-bill-wave"></i> Valor (R$)</label>
+                                <input type="number" id="valorDespesa" class="form-control" step="0.01" required placeholder="0,00" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-align-left"></i> Descrição</label>
+                        <input type="text" id="descDespesa" class="form-control" placeholder="Ex: Aluguel do mês">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label><i class="fas fa-calendar"></i> Data</label>
+                                <input type="date" id="dataDespesa" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label><i class="fas fa-credit-card"></i> Pagamento</label>
+                                <select id="pagamentoDespesa" class="form-control" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="Dinheiro">Dinheiro</option>
+                                    <option value="Pix">Pix</option>
+                                    <option value="Cartão Crédito">Cartão de Crédito</option>
+                                    <option value="Cartão Débito">Cartão de Débito</option>
+                                    <option value="Boleto">Boleto</option>
+                                    <option value="Transferência">Transferência</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label><i class="fas fa-check-circle"></i> Status</label>
+                                <select id="statusDespesa" class="form-control">
+                                    <option value="Pago">Pago</option>
+                                    <option value="Pendente">Pendente</option>
+                                    <option value="Atrasado">Atrasado</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-primary" id="btnSalvarDespesa" style="flex: 1;">
+                            <i class="fas fa-save"></i> Salvar Despesa
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btnCancelarDespesa" style="display: none;">
+                            <i class="fas fa-times-circle"></i> Cancelar Edição
+                        </button>
+                    </div>
+                    
+                    <div id="statusDespesaMsg" class="status-message"></div>
+                </form>
+            </div>
+            
+            <!-- Tabela de Despesas (ESTILO IGUAL AO HISTÓRICO) -->
+            <div class="card-table">
+                <!-- Toolbar -->
+                <div class="table-toolbar">
+                    <div class="filters-group">
+                        <div class="filter-item">
+                            <i class="fas fa-calendar-alt"></i>
+                            <input type="date" id="despesaDataInicial" class="filter-input" placeholder="Data inicial">
+                        </div>
+                        <div class="filter-item">
+                            <i class="fas fa-calendar-check"></i>
+                            <input type="date" id="despesaDataFinal" class="filter-input" placeholder="Data final">
+                        </div>
+                        <div class="filter-item">
+                            <i class="fas fa-tags"></i>
+                            <select id="categoriaFiltro" class="filter-input">
+                                <option value="">Todas categorias</option>
+                                <option value="Aluguel">Aluguel</option>
+                                <option value="Salários">Salários</option>
+                                <option value="Água">Água</option>
+                                <option value="Luz">Luz</option>
+                                <option value="Internet">Internet</option>
+                                <option value="Telefone">Telefone</option>
+                                <option value="Material">Material/Estoque</option>
+                                <option value="Manutenção">Manutenção</option>
+                                <option value="Impostos">Impostos</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Transporte">Transporte</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btnFiltrarDespesa">
+                            <i class="fas fa-filter"></i> Filtrar
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="btnLimparFiltroDespesa">
+                            <i class="fas fa-undo-alt"></i> Limpar
+                        </button>
+                    </div>
+                    
+                    <div class="export-group">
+                        <button class="btn btn-success btn-sm" id="btnExportarDespesasExcel" title="Exportar Excel">
+                            <i class="fas fa-file-excel"></i> Excel
+                        </button>
+                        <button class="btn btn-danger btn-sm" id="btnExportarDespesasPDF" title="Exportar PDF">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Tabela -->
+                <div class="table-wrapper">
+                    <table class="table-modern" id="tabelaDespesas">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Categoria</th>
+                                <th>Descrição</th>
+                                <th>Valor</th>
+                                <th>Pagamento</th>
+                                <th>Status</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaDespesasContainer">
+                            <!-- Preenchido via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Footer -->
+                <div class="table-footer">
+                    <div class="pagination-modern">
+                        <button class="page-btn" id="btnDespesaAnterior">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span class="page-info">
+                            Página <span id="pageInfoDespesa">1</span> de <span id="totalPaginasDespesa">1</span>
+                        </span>
+                        <button class="page-btn" id="btnDespesaProxima">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="table-info">
+                        <i class="fas fa-receipt"></i>
+                        <span>Total de despesas: <strong id="totalRegistrosDespesa">0</strong></span>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
     
+    <!-- JavaScript -->
     <script src="script.js"></script>
 </body>
 </html>
