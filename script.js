@@ -1,21 +1,24 @@
-// URL do Google Apps Script
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby3FpkSJIKGfsLVpmH_HYr9I9WWxL79M5wtFK7lyAaIM5QeWbY8WkYDJq1e2K3ZlGTJEA/exec';
+// ==================== CONFIGURAÇÃO ====================
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxy2FUUBdpLWlEbxJUfEQirNAhkmvp_7eEOs8Z1wSSINoQGbm4OncUjJ9HRe5h8lOntzw/exec';
 
 // Variáveis globais
-let todosDados = [], dadosFiltradosHistorico = [];
-let paginaAtual = 1; const itensPorPagina = 10;
-let graficoVendas = null, graficoPagamento = null, graficoDescontos = null, graficoValorPagamento = null;
+let todosDados = [];
+let dadosFiltradosHistorico = [];
+let todasDespesas = [];
+let despesasFiltradas = [];
+let paginaAtual = 1;
+let paginaDespesaAtual = 1;
+const itensPorPagina = 30;
+const itensDespesaPorPagina = 30;
 
-// --- FUNÇÕES UTILITÁRIAS ---
-function formatarData(data) {
-    return data.toLocaleDateString('pt-BR', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-}
+// Gráficos
+let graficoVendas = null;
+let graficoPagamento = null;
+let graficoDescontos = null;
+let graficoDespesasLucro = null;
+let graficoDespesasMes = null;
 
+// ==================== FUNÇÕES UTILITÁRIAS ====================
 function formatarMoeda(valor) {
     return valor.toLocaleString('pt-BR', {
         style: 'currency',
@@ -23,1003 +26,1573 @@ function formatarMoeda(valor) {
     });
 }
 
+function formatarDataVisual(dataStr) {
+    if (!dataStr) return '---';
+    try {
+        let d = new Date(dataStr);
+        if (isNaN(d.getTime())) {
+            let partes = dataStr.split(' ');
+            let dataPartes = partes[0].split('/');
+            if (dataPartes.length === 3) {
+                d = new Date(dataPartes[2], dataPartes[1] - 1, dataPartes[0]);
+            }
+        }
+        if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR');
+        }
+        return dataStr;
+    } catch (e) {
+        return dataStr;
+    }
+}
+
+function formatarDataDespesa(dataStr) {
+    if (!dataStr) return '---';
+    if (dataStr.includes('/')) {
+        return dataStr;
+    }
+    try {
+        let d = new Date(dataStr);
+        if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString('pt-BR');
+        }
+    } catch (e) {}
+    return dataStr;
+}
+
+function formatarDataParaRelatorio(dataStr) {
+    if (!dataStr) return '---';
+    try {
+        let d = new Date(dataStr);
+        if (isNaN(d.getTime())) {
+            let partes = dataStr.split(' ');
+            let dataPartes = partes[0].split('/');
+            if (dataPartes.length === 3) {
+                d = new Date(dataPartes[2], dataPartes[1] - 1, dataPartes[0]);
+            }
+        }
+        if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString('pt-BR');
+        }
+        return dataStr;
+    } catch (e) {
+        return dataStr;
+    }
+}
+
+function parseDataInteligente(dataStr) {
+    if (!dataStr) return null;
+    try {
+        let d = new Date(dataStr);
+        if (!isNaN(d.getTime())) return d;
+        let partes = dataStr.split(' ');
+        let dataPartes = partes[0].split('/');
+        if (dataPartes.length === 3) {
+            return new Date(dataPartes[2], dataPartes[1] - 1, dataPartes[0]);
+        }
+    } catch (e) {}
+    return null;
+}
+
+function converterDataParaComparacao(dataStr) {
+    if (!dataStr) return '';
+    if (dataStr.includes('/')) {
+        let partes = dataStr.split('/');
+        if (partes.length === 3) {
+            return `${partes[2]}-${partes[1]}-${partes[0]}`;
+        }
+    }
+    return dataStr;
+}
+
+function converterDataParaInput(dataStr) {
+    if (!dataStr) return '';
+    if (dataStr.includes('/')) {
+        let partes = dataStr.split('/');
+        if (partes.length === 3) {
+            return `${partes[2]}-${partes[1]}-${partes[0]}`;
+        }
+    }
+    return dataStr;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function atualizarDataAtual() {
-    document.getElementById('currentDate').textContent = formatarData(new Date());
-    document.getElementById('filterDate').textContent = 'Filtrar por data';
-    document.getElementById('reportDate').textContent = 'Período atual';
+    const data = new Date();
+    const dataStr = data.toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const currentDateElem = document.getElementById('currentDate');
+    if (currentDateElem) currentDateElem.textContent = dataStr;
 }
 
 function calcularValorFinal() {
     const valor = parseFloat(document.getElementById('valorInput').value) || 0;
     const desconto = parseFloat(document.getElementById('descontoInput').value) || 0;
     const valorFinal = Math.max(0, valor - desconto);
-    document.getElementById('valorFinalDisplay').textContent = formatarMoeda(valorFinal);
+    const valorFinalDisplay = document.getElementById('valorFinalDisplay');
+    if (valorFinalDisplay) valorFinalDisplay.textContent = formatarMoeda(valorFinal);
     
-    // Validação visual
     if (desconto > valor) {
-        document.getElementById('descontoInput').style.borderColor = 'var(--danger)';
-        document.getElementById('valorFinalDisplay').style.color = 'var(--danger)';
+        const descontoInput = document.getElementById('descontoInput');
+        if (descontoInput) descontoInput.style.borderColor = '#e63946';
+        if (valorFinalDisplay) valorFinalDisplay.style.color = '#e63946';
     } else {
-        document.getElementById('descontoInput').style.borderColor = '';
-        document.getElementById('valorFinalDisplay').style.color = 'var(--success)';
+        const descontoInput = document.getElementById('descontoInput');
+        if (descontoInput) descontoInput.style.borderColor = '';
+        if (valorFinalDisplay) valorFinalDisplay.style.color = '#2ec4b6';
     }
 }
 
-// --- INICIALIZAÇÃO DOS INPUTS ---
-document.addEventListener('DOMContentLoaded', function() {
-    // Atualizar valor final quando os inputs mudarem
-    document.getElementById('valorInput').addEventListener('input', calcularValorFinal);
-    document.getElementById('descontoInput').addEventListener('input', calcularValorFinal);
-    
-    // Calcular valor inicial
-    calcularValorFinal();
-});
-
-// --- FUNÇÕES DE NAVEGAÇÃO ---
-function showSection(id, btn, isDesktop = false) {
+// ==================== NAVEGAÇÃO ====================
+function showSection(sectionId) {
     if (sessionStorage.getItem('loja_logado') !== 'true') {
         document.getElementById('loginOverlay').classList.remove('hidden');
-        document.getElementById('loginStatus').textContent = "Faça login para acessar esta seção!";
-        document.getElementById('loginStatus').className = 'status-message status-error';
+        const loginStatus = document.getElementById('loginStatus');
+        if (loginStatus) {
+            loginStatus.textContent = "Faça login para acessar!";
+            loginStatus.className = 'status-message status-error';
+        }
         return;
     }
     
-    document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.section').forEach(el => {
+        el.classList.remove('active');
+    });
     
-    if (isDesktop) {
-        document.querySelectorAll('.menu-btn').forEach(el => el.classList.remove('active'));
-        if(btn) btn.classList.add('active');
-    }
+    const section = document.getElementById(sectionId);
+    if (section) section.classList.add('active');
+    
+    document.querySelectorAll('.menu-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-section') === sectionId) {
+            btn.classList.add('active');
+        }
+    });
     
     if (window.innerWidth <= 992) {
-        const mobileBtns = document.querySelectorAll('.mobile-nav-btn');
-        if (mobileBtns.length >= 4) {
-            const indexMap = {
-                'novaVenda': 0,
-                'lancamentos': 1,
-                'relatorios': 2
-            };
-            
-            document.querySelectorAll('.mobile-nav-btn').forEach(el => el.classList.remove('active'));
-            if (indexMap[id] !== undefined) {
-                mobileBtns[indexMap[id]].classList.add('active');
+        document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('data-section') === sectionId) {
+                btn.classList.add('active');
             }
-        }
+        });
     }
     
-    if(id === 'lancamentos' || id === 'relatorios') carregarDados();
+    if (sectionId === 'lancamentos' || sectionId === 'relatorios') {
+        carregarDados();
+    }
+    if (sectionId === 'despesas') {
+        carregarDespesas();
+    }
 }
 
-// --- LOGIN ---
-document.getElementById('loginForm').addEventListener('submit', e => {
-    e.preventDefault();
-    const btn = document.getElementById('btnLogin');
-    const status = document.getElementById('loginStatus');
-    
-    const email = document.getElementById('loginEmail').value.trim();
-    const senha = document.getElementById('loginPassword').value.trim();
-    
-    if (!email || !senha) {
-        status.textContent = "Por favor, preencha todos os campos!";
-        status.className = 'status-message status-error';
-        return;
-    }
-
-    const fd = new FormData();
-    fd.append('action', 'login');
-    fd.append('email', email);
-    fd.append('senha', senha);
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
-
-    fetch(SCRIPT_URL, { method: 'POST', body: fd })
-    .then(res => res.json())
-    .then(res => {
-        if(res.status === 'sucesso') {
-            sessionStorage.setItem('user_email', email);
-            sessionStorage.setItem('loja_logado', 'true');
+// ==================== LOGIN ====================
+const loginForm = document.getElementById('loginForm');
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const btn = document.getElementById('btnLogin');
+        const statusDiv = document.getElementById('loginStatus');
+        const email = document.getElementById('loginEmail').value.trim();
+        const senha = document.getElementById('loginPassword').value.trim();
+        
+        if (!email || !senha) {
+            if (statusDiv) {
+                statusDiv.textContent = "Preencha todos os campos!";
+                statusDiv.className = 'status-message status-error';
+            }
+            return;
+        }
+        
+        const fd = new FormData();
+        fd.append('action', 'login');
+        fd.append('email', email);
+        fd.append('senha', senha);
+        
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
+        }
+        
+        try {
+            const response = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+            const res = await response.json();
             
-            document.getElementById('loginOverlay').classList.add('hidden');
-            document.getElementById('userEmail').textContent = email;
-            document.getElementById('userInfo').classList.add('active');
-            document.getElementById('loginForm').reset();
-            status.textContent = "";
-            
-            atualizarDataAtual();
-            carregarDados();
-            
-            if (window.innerWidth > 992) {
-                document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
-                document.querySelector('.menu-btn').classList.add('active');
+            if (res.status === 'sucesso') {
+                sessionStorage.setItem('loja_logado', 'true');
+                sessionStorage.setItem('user_email', email);
+                
+                const loginOverlay = document.getElementById('loginOverlay');
+                if (loginOverlay) loginOverlay.classList.add('hidden');
+                
+                const userInfo = document.getElementById('userInfo');
+                if (userInfo) userInfo.classList.add('active');
+                
+                const userEmail = document.getElementById('userEmail');
+                if (userEmail) userEmail.textContent = email;
+                
+                atualizarDataAtual();
+                carregarDados();
+                carregarDespesas();
+                showSection('novaVenda');
             } else {
-                document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
-                document.querySelector('.mobile-nav-btn').classList.add('active');
+                if (statusDiv) {
+                    statusDiv.textContent = res.message || "Credenciais inválidas!";
+                    statusDiv.className = 'status-message status-error';
+                }
             }
-            showSection('novaVenda');
-        } else {
-            status.textContent = res.message || "Credenciais inválidas!";
-            status.className = 'status-message status-error';
+        } catch (error) {
+            console.error('Erro no login:', error);
+            if (statusDiv) {
+                statusDiv.textContent = "Erro na conexão!";
+                statusDiv.className = 'status-message status-error';
+            }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
+            }
         }
-    })
-    .catch(() => {
-        status.textContent = "Erro na conexão. Tente novamente.";
-        status.className = 'status-message status-error';
-    })
-    .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
     });
-});
-
-function fazerLogout() {
-    sessionStorage.clear();
-    localStorage.clear();
-    
-    document.getElementById('loginOverlay').classList.remove('hidden');
-    document.getElementById('userInfo').classList.remove('active');
-    document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
-    document.getElementById('loginStatus').textContent = "Sessão encerrada. Faça login novamente.";
-    document.getElementById('loginStatus').className = 'status-message status-success';
-    document.getElementById('loginForm').reset();
-    
-    if (window.innerWidth > 992) {
-        document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('.menu-btn').classList.add('active');
-    } else {
-        document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('.mobile-nav-btn').classList.add('active');
-    }
-    showSection('novaVenda');
-    
-    todosDados = [];
-    dadosFiltradosHistorico = [];
 }
 
-// --- VALIDAÇÃO DO FORMULÁRIO ---
-function validarVenda() {
-    const valor = parseFloat(document.getElementById('valorInput').value) || 0;
-    const desconto = parseFloat(document.getElementById('descontoInput').value) || 0;
-    const pagamento = document.getElementById('pagInput').value;
-    const descricao = document.getElementById('descInput').value.trim();
-    
-    if (!descricao) {
-        alert("Por favor, informe a descrição da venda!");
-        document.getElementById('descInput').focus();
-        return false;
-    }
-    
-    if (valor <= 0) {
-        alert("O valor da venda deve ser maior que zero!");
-        document.getElementById('valorInput').focus();
-        return false;
-    }
-    
-    if (desconto < 0) {
-        alert("O desconto não pode ser negativo!");
-        document.getElementById('descontoInput').focus();
-        return false;
-    }
-    
-    if (desconto > valor) {
-        alert("O desconto não pode ser maior que o valor da venda!");
-        document.getElementById('descontoInput').focus();
-        document.getElementById('descontoInput').value = valor;
-        calcularValorFinal();
-        return false;
-    }
-    
-    if (!pagamento) {
-        alert("Por favor, selecione a forma de pagamento!");
-        document.getElementById('pagInput').focus();
-        return false;
-    }
-    
-    return true;
+const logoutBtn = document.getElementById('logoutBtn');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        sessionStorage.clear();
+        location.reload();
+    });
 }
 
-// --- REGISTRAR VENDA ---
-document.getElementById('vendaForm').addEventListener('submit', e => {
-    e.preventDefault();
-    
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        document.getElementById('loginStatus').textContent = "Faça login para registrar vendas!";
-        document.getElementById('loginStatus').className = 'status-message status-error';
-        return;
-    }
-    
-    if (!validarVenda()) return;
-    
-    const btn = document.getElementById('btnSalvar');
-    const status = document.getElementById('status');
-    const isEdit = document.getElementById('editId').value !== "";
-    
-    const formData = new FormData(e.target);
-    const emailLogado = sessionStorage.getItem('user_email') || "Desconhecido";
-    formData.append('vendedor', emailLogado);
-
-    if (isEdit) {
-        formData.append('action', 'editar');
-        formData.append('id', document.getElementById('editId').value);
-    } else {
-        formData.set('action', 'salvar');
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
-
-    fetch(SCRIPT_URL, { method: 'POST', body: formData })
-    .then(res => res.json())
-    .then(response => {
-        if(response.status === 'sucesso') {
-            status.textContent = "✅ " + response.message;
-            status.className = 'status-message status-success';
+// ==================== VENDAS ====================
+const vendaForm = document.getElementById('vendaForm');
+if (vendaForm) {
+    vendaForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (sessionStorage.getItem('loja_logado') !== 'true') {
+            alert("Faça login primeiro!");
+            return;
+        }
+        
+        const descricao = document.getElementById('descInput').value.trim();
+        const valor = parseFloat(document.getElementById('valorInput').value) || 0;
+        const desconto = parseFloat(document.getElementById('descontoInput').value) || 0;
+        const pagamento = document.getElementById('pagInput').value;
+        
+        if (!descricao) {
+            alert("Informe a descrição!");
+            return;
+        }
+        if (valor <= 0) {
+            alert("Valor deve ser maior que zero!");
+            return;
+        }
+        if (desconto > valor) {
+            alert("Desconto não pode ser maior que o valor!");
+            return;
+        }
+        if (!pagamento) {
+            alert("Selecione a forma de pagamento!");
+            return;
+        }
+        
+        const btn = document.getElementById('btnSalvar');
+        const statusDiv = document.getElementById('status');
+        const editId = document.getElementById('editId').value;
+        const isEdit = editId !== "";
+        
+        const fd = new FormData();
+        fd.append('action', isEdit ? 'editar' : 'salvar');
+        if (isEdit) fd.append('id', editId);
+        fd.append('descricao', descricao);
+        fd.append('valor', valor.toString());
+        fd.append('desconto', desconto.toString());
+        fd.append('pagamento', pagamento);
+        fd.append('vendedor', sessionStorage.getItem('user_email'));
+        
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+        }
+        
+        try {
+            const response = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+            const res = await response.json();
             
-            if(isEdit) {
-                cancelarEdicao();
+            if (res.status === 'sucesso') {
+                if (statusDiv) {
+                    statusDiv.textContent = res.message;
+                    statusDiv.className = 'status-message status-success';
+                }
+                
+                if (isEdit) {
+                    cancelarEdicao();
+                } else {
+                    vendaForm.reset();
+                    const valorInput = document.getElementById('valorInput');
+                    const descontoInput = document.getElementById('descontoInput');
+                    if (valorInput) valorInput.value = '0';
+                    if (descontoInput) descontoInput.value = '0';
+                    calcularValorFinal();
+                }
+                
+                carregarDados();
+                setTimeout(() => {
+                    if (statusDiv) {
+                        statusDiv.textContent = '';
+                        statusDiv.className = 'status-message';
+                    }
+                }, 3000);
             } else {
-                e.target.reset();
-                calcularValorFinal();
+                throw new Error(res.message);
             }
-            
-            carregarDados();
-            setTimeout(() => status.textContent = "", 3000);
-        } else {
-            throw new Error(response.message);
+        } catch (error) {
+            console.error('Erro ao salvar venda:', error);
+            if (statusDiv) {
+                statusDiv.textContent = "Erro ao salvar!";
+                statusDiv.className = 'status-message status-error';
+            }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = isEdit ? '<i class="fas fa-save"></i> Atualizar' : '<i class="fas fa-check-circle"></i> Confirmar Venda';
+            }
         }
-    })
-    .catch(err => {
-        status.textContent = "❌ " + err.message;
-        status.className = 'status-message status-error';
-    })
-    .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = isEdit ? 
-            '<i class="fas fa-save"></i> Atualizar' : 
-            '<i class="fas fa-check-circle"></i> Confirmar Venda';
     });
-});
+}
 
-// --- CARREGAR DADOS ---
-function carregarDados() {
+async function carregarDados() {
     if (sessionStorage.getItem('loja_logado') !== 'true') return;
-    
-    const container = document.getElementById('tabelaContainer');
-    if(container) {
-        container.innerHTML = `
-            <div style="padding: 3rem; text-align: center;">
-                <i class="fas fa-spinner fa-spin fa-2x" style="color: var(--primary);"></i>
-                <p style="margin-top: 1rem; color: var(--gray);">Carregando dados...</p>
-            </div>
-        `;
-    }
     
     const fd = new FormData();
     fd.append('action', 'listar');
-
-    fetch(SCRIPT_URL, { method: 'POST', body: fd })
-    .then(res => res.json())
-    .then(res => {
-        if(res.status === 'sucesso') {
-            todosDados = (res.data || []).slice().reverse();
+    
+    try {
+        const response = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+        const res = await response.json();
+        
+        if (res.status === 'sucesso') {
+            todosDados = (res.data || []).sort((a, b) => {
+                const dataA = parseDataInteligente(a.data);
+                const dataB = parseDataInteligente(b.data);
+                if (!dataA && !dataB) return 0;
+                if (!dataA) return 1;
+                if (!dataB) return -1;
+                return dataB - dataA;
+            });
             dadosFiltradosHistorico = [...todosDados];
             paginaAtual = 1;
             renderizarPagina();
-            gerarRelatorios(todosDados);
-            gerarGraficos(todosDados);
+            gerarRelatoriosCompletos();
+            gerarGraficosVendas(todosDados);
+            gerarGraficosDespesas();
         }
-    })
-    .catch(err => {
-        if(container) {
-            container.innerHTML = `
-                <div style="padding: 3rem; text-align: center;">
-                    <i class="fas fa-exclamation-triangle fa-2x" style="color: var(--danger);"></i>
-                    <p style="margin-top: 1rem; color: var(--danger);">Erro ao carregar dados</p>
-                </div>
-            `;
-        }
-    });
-}
-
-// --- PROCESSAMENTO DE DATAS ---
-function parseDataInteligente(dataStr) {
-    if(!dataStr) return null;
-    let d = new Date(dataStr);
-    if(!isNaN(d.getTime())) return d;
-    try {
-        let partes = dataStr.split(' ');
-        let dataParts = partes[0].split('/');
-        if(dataParts.length === 3) return new Date(dataParts[2], dataParts[1]-1, dataParts[0]);
-    } catch(e) {}
-    return null;
-}
-
-function formatarDataVisual(dataStr) {
-    if (!dataStr) return "---";
-    const d = parseDataInteligente(dataStr);
-    if(!d) return dataStr;
-    const dia = String(d.getDate()).padStart(2,'0');
-    const mes = String(d.getMonth()+1).padStart(2,'0');
-    const ano = d.getFullYear();
-    const hora = String(d.getHours()).padStart(2,'0');
-    const min = String(d.getMinutes()).padStart(2,'0');
-    return `${dia}/${mes}/${ano} ${hora}:${min}`;
-}
-
-function getBadgeClass(pagamento) {
-    switch(pagamento) {
-        case 'Pix': return 'badge-pix';
-        case 'Cartão Crédito':
-        case 'Cartão Débito': return 'badge-card';
-        case 'Dinheiro': return 'badge-money';
-        default: return '';
+    } catch (error) {
+        console.error('Erro ao carregar dados:', error);
     }
 }
 
-// --- RENDERIZAR TABELA COM DESCONTO ---
 function renderizarPagina() {
     const container = document.getElementById('tabelaContainer');
-    const controls = document.getElementById('paginationControls');
     const pageInfo = document.getElementById('pageInfo');
+    const totalPaginasSpan = document.getElementById('totalPaginas');
+    const totalRegistrosSpan = document.getElementById('totalRegistros');
+    const btnAnterior = document.getElementById('btnPaginaAnterior');
+    const btnProxima = document.getElementById('btnPaginaProxima');
     
-    if(dadosFiltradosHistorico.length === 0) {
+    if (!container) return;
+    
+    const totalRegistros = dadosFiltradosHistorico.length;
+    const totalPags = Math.ceil(totalRegistros / itensPorPagina);
+    
+    if (totalRegistrosSpan) totalRegistrosSpan.textContent = totalRegistros;
+    if (totalPaginasSpan) totalPaginasSpan.textContent = totalPags || 1;
+    if (pageInfo) pageInfo.textContent = paginaAtual;
+    
+    if (btnAnterior) btnAnterior.disabled = paginaAtual === 1;
+    if (btnProxima) btnProxima.disabled = paginaAtual === totalPags;
+    
+    if (dadosFiltradosHistorico.length === 0) {
         container.innerHTML = `
-            <div style="padding: 3rem; text-align: center;">
-                <i class="fas fa-inbox fa-2x" style="color: var(--gray);"></i>
-                <p style="margin-top: 1rem; color: var(--gray);">Nenhuma venda encontrada</p>
-            </div>
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 3rem;">
+                    <i class="fas fa-inbox" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem; display: block;"></i>
+                    <p style="color: #999;">Nenhuma venda encontrada</p>
+                    <small style="color: #ccc;">Tente ajustar os filtros de busca</small>
+                </td>
+            </tr>
         `;
-        controls.style.display = 'none';
         return;
     }
     
-    controls.style.display = 'flex';
     const inicio = (paginaAtual - 1) * itensPorPagina;
     const fim = inicio + itensPorPagina;
     const pagData = dadosFiltradosHistorico.slice(inicio, fim);
-    const totalPags = Math.ceil(dadosFiltradosHistorico.length / itensPorPagina);
-    pageInfo.innerText = `${paginaAtual}/${totalPags}`;
-
-    let html = `
-        <table>
-            <thead>
-                <tr>
-                    <th>Data/Hora</th>
-                    <th>Descrição</th>
-                    <th>Valor Bruto</th>
-                    <th>Desconto</th>
-                    <th>Valor Líquido</th>
-                    <th>Pagamento</th>
-                    <th>Vendedor</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
     
-    pagData.forEach(item => {
-        const descricaoSegura = item.descricao
-            .replace(/'/g, "&#39;")
-            .replace(/"/g, "&quot;")
-            .replace(/\\/g, "&#92;");
-        
-        const badgeClass = getBadgeClass(item.pagamento);
+    let html = '';
+    
+    for (const item of pagData) {
         const valorBruto = parseFloat(item.valor) || 0;
         const desconto = parseFloat(item.desconto) || 0;
         const valorLiquido = valorBruto - desconto;
         
+        let badgeClass = '';
+        if (item.pagamento === 'Pix') badgeClass = 'badge-pix';
+        else if (item.pagamento === 'Cartão Crédito' || item.pagamento === 'Cartão Débito') badgeClass = 'badge-card';
+        else if (item.pagamento === 'Dinheiro') badgeClass = 'badge-money';
+        else badgeClass = 'badge-card';
+        
         html += `
             <tr>
-                <td style="font-weight: 500;">${formatarDataVisual(item.data)}</td>
-                <td>${item.descricao}</td>
-                <td style="font-weight: 700; color: var(--warning);">
-                    R$ ${valorBruto.toFixed(2).replace('.', ',')}
-                </td>
-                <td style="font-weight: 700; color: var(--danger);">
-                    R$ ${desconto.toFixed(2).replace('.', ',')}
-                </td>
-                <td style="font-weight: 700; color: var(--success);">
-                    R$ ${valorLiquido.toFixed(2).replace('.', ',')}
-                </td>
-                <td><span class="badge ${badgeClass}">${item.pagamento}</span></td>
-                <td style="font-size: 0.9em; color: var(--primary);">${item.vendedor || '---'}</td>
-                <td>
-                    <button class="btn-icon" onclick="prepararEdicao('${item.id}', '${descricaoSegura}', '${item.valor}', '${item.pagamento}', '${item.desconto || 0}')" 
-                            style="background: rgba(255, 159, 28, 0.1); color: var(--warning); margin-right: 5px;">
+                <td style="font-size: 0.8rem;">${formatarDataVisual(item.data)}</td>
+                <td><strong>${escapeHtml(item.descricao)}</strong></td>
+                <td class="valor-bruto">${formatarMoeda(valorBruto)}</td>
+                <td class="valor-desconto">${formatarMoeda(desconto)}</td>
+                <td class="valor-liquido">${formatarMoeda(valorLiquido)}</td>
+                <td><span class="${badgeClass}">${item.pagamento}</span></td>
+                <td>${item.vendedor || '-'}</td>
+                <td class="text-center" style="white-space: nowrap;">
+                    <button class="btn-action btn-action-edit" onclick="prepararEdicao('${item.id}', '${escapeHtml(item.descricao)}', '${item.valor}', '${item.pagamento}', '${item.desconto || 0}')" title="Editar">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-icon" onclick="excluirItem('${item.id}')" 
-                            style="background: rgba(230, 57, 70, 0.1); color: var(--danger);">
+                    <button class="btn-action btn-action-delete" onclick="excluirItem('${item.id}')" title="Excluir">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 </td>
             </tr>
         `;
-    });
+    }
     
-    html += '</tbody></table>';
     container.innerHTML = html;
 }
 
-function mudarPagina(d) {
-    const total = Math.ceil(dadosFiltradosHistorico.length / itensPorPagina);
-    if(paginaAtual + d > 0 && paginaAtual + d <= total) {
-        paginaAtual += d;
+function prepararEdicao(id, descricao, valor, pagamento, desconto) {
+    showSection('novaVenda');
+    const editId = document.getElementById('editId');
+    const descInput = document.getElementById('descInput');
+    const valorInput = document.getElementById('valorInput');
+    const pagInput = document.getElementById('pagInput');
+    const descontoInput = document.getElementById('descontoInput');
+    const btnSalvar = document.getElementById('btnSalvar');
+    const btnCancelar = document.getElementById('btnCancelar');
+    
+    if (editId) editId.value = id;
+    if (descInput) descInput.value = descricao;
+    if (valorInput) valorInput.value = valor;
+    if (pagInput) pagInput.value = pagamento;
+    if (descontoInput) descontoInput.value = desconto;
+    if (btnSalvar) btnSalvar.innerHTML = '<i class="fas fa-save"></i> Atualizar';
+    if (btnCancelar) btnCancelar.style.display = 'block';
+    calcularValorFinal();
+}
+
+function cancelarEdicao() {
+    const vendaForm = document.getElementById('vendaForm');
+    const editId = document.getElementById('editId');
+    const valorInput = document.getElementById('valorInput');
+    const descontoInput = document.getElementById('descontoInput');
+    const btnSalvar = document.getElementById('btnSalvar');
+    const btnCancelar = document.getElementById('btnCancelar');
+    
+    if (vendaForm) vendaForm.reset();
+    if (editId) editId.value = '';
+    if (valorInput) valorInput.value = '0';
+    if (descontoInput) descontoInput.value = '0';
+    if (btnSalvar) btnSalvar.innerHTML = '<i class="fas fa-check-circle"></i> Confirmar Venda';
+    if (btnCancelar) btnCancelar.style.display = 'none';
+    calcularValorFinal();
+}
+
+async function excluirItem(id) {
+    if (!confirm("Tem certeza que deseja excluir esta venda?")) return;
+    
+    const fd = new FormData();
+    fd.append('action', 'excluir');
+    fd.append('id', id);
+    
+    try {
+        await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+        carregarDados();
+    } catch (error) {
+        alert("Erro ao excluir!");
+    }
+}
+
+// ==================== FILTROS DO HISTÓRICO ====================
+function aplicarFiltroHistorico() {
+    const dataIni = document.getElementById('dataInicial').value;
+    const dataFim = document.getElementById('dataFinal').value;
+    const buscaInput = document.getElementById('buscaInput');
+    const buscaTermo = buscaInput ? buscaInput.value.toLowerCase().trim() : '';
+    
+    let dadosFiltrados = [...todosDados];
+    
+    if (buscaTermo) {
+        dadosFiltrados = dadosFiltrados.filter(item => 
+            item.descricao.toLowerCase().includes(buscaTermo)
+        );
+    }
+    
+    if (dataIni && dataFim) {
+        const dIni = new Date(dataIni);
+        const dFim = new Date(dataFim);
+        dFim.setHours(23, 59, 59);
+        
+        dadosFiltrados = dadosFiltrados.filter(item => {
+            const data = parseDataInteligente(item.data);
+            return data && data >= dIni && data <= dFim;
+        });
+        const filterDate = document.getElementById('filterDate');
+        if (filterDate) filterDate.textContent = `Filtro: ${dataIni} até ${dataFim}`;
+    } else {
+        const filterDate = document.getElementById('filterDate');
+        if (filterDate) filterDate.textContent = 'Todos os registros';
+    }
+    
+    dadosFiltradosHistorico = dadosFiltrados;
+    paginaAtual = 1;
+    renderizarPagina();
+}
+
+function limparFiltroHistorico() {
+    const dataInicial = document.getElementById('dataInicial');
+    const dataFinal = document.getElementById('dataFinal');
+    const buscaInput = document.getElementById('buscaInput');
+    
+    if (dataInicial) dataInicial.value = '';
+    if (dataFinal) dataFinal.value = '';
+    if (buscaInput) buscaInput.value = '';
+    
+    dadosFiltradosHistorico = [...todosDados];
+    paginaAtual = 1;
+    renderizarPagina();
+    
+    const filterDate = document.getElementById('filterDate');
+    if (filterDate) filterDate.textContent = 'Todos os registros';
+}
+
+function filtrarPorBusca() {
+    const buscaInput = document.getElementById('buscaInput');
+    if (buscaInput) {
+        const termo = buscaInput.value.toLowerCase().trim();
+        
+        if (termo === '') {
+            dadosFiltradosHistorico = [...todosDados];
+        } else {
+            dadosFiltradosHistorico = todosDados.filter(item => 
+                item.descricao.toLowerCase().includes(termo)
+            );
+        }
+        
+        const dataIni = document.getElementById('dataInicial').value;
+        const dataFim = document.getElementById('dataFinal').value;
+        
+        if (dataIni && dataFim) {
+            const dIni = new Date(dataIni);
+            const dFim = new Date(dataFim);
+            dFim.setHours(23, 59, 59);
+            
+            dadosFiltradosHistorico = dadosFiltradosHistorico.filter(item => {
+                const data = parseDataInteligente(item.data);
+                return data && data >= dIni && data <= dFim;
+            });
+        }
+        
+        paginaAtual = 1;
         renderizarPagina();
     }
 }
 
-// --- FUNÇÃO PARA PREPARAR EDIÇÃO ---
-function prepararEdicao(id, d, v, p, desconto = 0) {
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        document.getElementById('loginStatus').textContent = "Faça login para editar registros!";
-        document.getElementById('loginStatus').className = 'status-message status-error';
-        return;
-    }
-    
-    showSection('novaVenda');
-    document.getElementById('editId').value = id;
-    
-    const descricaoDecodificada = d
-        .replace(/&#39;/g, "'")
-        .replace(/&quot;/g, '"')
-        .replace(/&#92;/g, '\\');
-    
-    document.getElementById('descInput').value = descricaoDecodificada;
-    document.getElementById('valorInput').value = v;
-    document.getElementById('pagInput').value = p;
-    document.getElementById('descontoInput').value = desconto;
-    document.getElementById('btnSalvar').innerHTML = '<i class="fas fa-save"></i> Atualizar';
-    document.getElementById('btnCancelar').style.display = "block";
-    
-    calcularValorFinal();
-    document.getElementById('valorInput').focus();
-}
-
-function cancelarEdicao() {
-    document.getElementById('vendaForm').reset();
-    document.getElementById('editId').value = "";
-    document.getElementById('btnSalvar').innerHTML = '<i class="fas fa-check-circle"></i> Confirmar Venda';
-    document.getElementById('btnCancelar').style.display = "none";
-    calcularValorFinal();
-}
-
-// --- FILTROS ---
-function aplicarFiltroHistorico() {
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        return;
-    }
-    
-    const i = document.getElementById('dataInicial').value;
-    const f = document.getElementById('dataFinal').value;
-    if(!i || !f) {
-        alert("Selecione a data inicial e final para filtrar");
-        return;
-    }
-    const dI = new Date(i + "T00:00:00");
-    const dF = new Date(f + "T23:59:59");
-    dadosFiltradosHistorico = todosDados.filter(item => {
-        const d = parseDataInteligente(item.data);
-        return d && d >= dI && d <= dF;
-    });
-    paginaAtual = 1;
-    renderizarPagina();
-    document.getElementById('filterDate').textContent = `Filtro: ${i} até ${f}`;
-}
-
-function limparFiltroHistorico() {
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        return;
-    }
-    
-    document.getElementById('dataInicial').value = "";
-    document.getElementById('dataFinal').value = "";
-    dadosFiltradosHistorico = [...todosDados];
-    paginaAtual = 1;
-    renderizarPagina();
-    document.getElementById('filterDate').textContent = 'Filtrar por data';
-}
-
-function filtrarRelatorio() {
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        return;
-    }
-    
-    const i = document.getElementById('dataInicialRel').value;
-    const f = document.getElementById('dataFinalRel').value;
-    if(!i || !f) {
-        alert("Selecione o período para filtrar");
-        return;
-    }
-    const dI = new Date(i + "T00:00:00");
-    const dF = new Date(f + "T23:59:59");
-    const filtrados = todosDados.filter(item => {
-        const d = parseDataInteligente(item.data);
-        return d && d >= dI && d <= dF;
-    });
-    gerarRelatorios(filtrados);
-    gerarGraficos(filtrados);
-    document.getElementById('reportDate').textContent = `Período: ${i} até ${f}`;
-}
-
-function limparFiltroRelatorio() {
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        return;
-    }
-    
-    document.getElementById('dataInicialRel').value = "";
-    document.getElementById('dataFinalRel').value = "";
-    gerarRelatorios(todosDados);
-    gerarGraficos(todosDados);
-    document.getElementById('reportDate').textContent = 'Período atual';
-}
-
-// --- EXCLUSÃO ---
-function excluirItem(id) {
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        document.getElementById('loginStatus').textContent = "Faça login para excluir registros!";
-        document.getElementById('loginStatus').className = 'status-message status-error';
-        return;
-    }
-    
-    if(confirm("Tem certeza que deseja excluir esta venda?")) {
-        const fd = new FormData();
-        fd.append('action','excluir');
-        fd.append('id',id);
-        fetch(SCRIPT_URL, {method:'POST', body:fd})
-            .then(() => carregarDados())
-            .catch(() => alert("Erro ao excluir. Tente novamente."));
-    }
-}
-
-// --- RELATÓRIOS COM DESCONTO ---
-function gerarRelatorios(dados) {
+// ==================== DESPESAS (REFATORADO) ====================
+async function carregarDespesas() {
     if (sessionStorage.getItem('loja_logado') !== 'true') return;
     
-    const hojeStr = new Date().toLocaleDateString('pt-BR');
+    const fd = new FormData();
+    fd.append('action', 'listarDespesas');
+    
+    try {
+        const response = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+        const res = await response.json();
+        
+        if (res.status === 'sucesso') {
+            todasDespesas = (res.data || []).sort((a, b) => {
+                const dataA = parseDataInteligente(a.data);
+                const dataB = parseDataInteligente(b.data);
+                if (!dataA && !dataB) return 0;
+                if (!dataA) return 1;
+                if (!dataB) return -1;
+                return dataB - dataA;
+            });
+            despesasFiltradas = [...todasDespesas];
+            paginaDespesaAtual = 1;
+            renderizarTabelaDespesas();
+            gerarRelatoriosCompletos();
+            gerarGraficosDespesas();
+        }
+    } catch (error) {
+        console.error('Erro ao carregar despesas:', error);
+    }
+}
+
+function renderizarTabelaDespesas() {
+    const container = document.getElementById('tabelaDespesasContainer');
+    const pageInfoDespesa = document.getElementById('pageInfoDespesa');
+    const totalPaginasDespesa = document.getElementById('totalPaginasDespesa');
+    const totalRegistrosDespesa = document.getElementById('totalRegistrosDespesa');
+    const btnDespesaAnterior = document.getElementById('btnDespesaAnterior');
+    const btnDespesaProxima = document.getElementById('btnDespesaProxima');
+    
+    if (!container) return;
+    
+    const totalRegistros = despesasFiltradas.length;
+    const totalPags = Math.ceil(totalRegistros / itensDespesaPorPagina);
+    
+    if (totalRegistrosDespesa) totalRegistrosDespesa.textContent = totalRegistros;
+    if (totalPaginasDespesa) totalPaginasDespesa.textContent = totalPags || 1;
+    if (pageInfoDespesa) pageInfoDespesa.textContent = paginaDespesaAtual;
+    
+    if (btnDespesaAnterior) btnDespesaAnterior.disabled = paginaDespesaAtual === 1;
+    if (btnDespesaProxima) btnDespesaProxima.disabled = paginaDespesaAtual === totalPags;
+    
+    if (despesasFiltradas.length === 0) {
+        container.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 3rem;">
+                    <i class="fas fa-inbox" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem; display: block;"></i>
+                    <p style="color: #999;">Nenhuma despesa encontrada</p>
+                    <small style="color: #ccc;">Tente ajustar os filtros de busca</small>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    const inicio = (paginaDespesaAtual - 1) * itensDespesaPorPagina;
+    const fim = inicio + itensDespesaPorPagina;
+    const pagData = despesasFiltradas.slice(inicio, fim);
+    
+    let html = '';
+    
+    for (const item of pagData) {
+        const valor = parseFloat(item.valor) || 0;
+        
+        let badgeStatusClass = '';
+        if (item.status === 'Pago') badgeStatusClass = 'badge-pago';
+        else if (item.status === 'Pendente') badgeStatusClass = 'badge-pendente';
+        else if (item.status === 'Atrasado') badgeStatusClass = 'badge-atrasado';
+        else badgeStatusClass = 'badge-pendente';
+        
+        html += `
+            <tr>
+                <td style="font-size: 0.8rem;">${formatarDataDespesa(item.data)}</td>
+                <td><span class="categoria-badge">${item.categoria}</span></td>
+                <td><strong>${escapeHtml(item.descricao) || '-'}</strong></td>
+                <td class="valor-despesa">${formatarMoeda(valor)}</td>
+                <td>${item.pagamento}</td>
+                <td><span class="${badgeStatusClass}">${item.status}</span></td>
+                <td class="text-center" style="white-space: nowrap;">
+                    <button class="btn-action btn-action-edit" onclick="editarDespesa('${item.id}')" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-action btn-action-delete" onclick="excluirDespesa('${item.id}')" title="Excluir">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }
+    
+    container.innerHTML = html;
+}
+
+const despesaForm = document.getElementById('despesaForm');
+if (despesaForm) {
+    despesaForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await salvarDespesa();
+    });
+}
+
+async function salvarDespesa() {
+    const id = document.getElementById('editDespesaId').value;
+    const isEdit = id !== "";
+    
+    const categoria = document.getElementById('categoriaInput').value;
+    const descricao = document.getElementById('descDespesa').value;
+    const valor = document.getElementById('valorDespesa').value;
+    const data = document.getElementById('dataDespesa').value;
+    const pagamento = document.getElementById('pagamentoDespesa').value;
+    const status = document.getElementById('statusDespesa').value;
+    
+    if (!categoria) {
+        alert("Selecione uma categoria!");
+        return;
+    }
+    if (!valor || parseFloat(valor) <= 0) {
+        alert("Informe um valor válido!");
+        return;
+    }
+    if (!data) {
+        alert("Informe a data!");
+        return;
+    }
+    if (!pagamento) {
+        alert("Selecione a forma de pagamento!");
+        return;
+    }
+    
+    const fd = new FormData();
+    fd.append('action', isEdit ? 'editarDespesa' : 'salvarDespesa');
+    if (isEdit) fd.append('id', id);
+    fd.append('categoria', categoria);
+    fd.append('descricao', descricao || '');
+    fd.append('valor', valor.toString());
+    fd.append('data', data);
+    fd.append('pagamento', pagamento);
+    fd.append('status', status);
+    fd.append('criadoPor', sessionStorage.getItem('user_email') || 'Sistema');
+    
+    const btn = document.getElementById('btnSalvarDespesa');
+    const statusMsg = document.getElementById('statusDespesaMsg');
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+    }
+    
+    try {
+        const response = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+        const res = await response.json();
+        
+        if (res.status === 'sucesso') {
+            if (statusMsg) {
+                statusMsg.textContent = res.message;
+                statusMsg.className = 'status-message status-success';
+            }
+            cancelarEdicaoDespesa();
+            despesaForm.reset();
+            const dataDespesa = document.getElementById('dataDespesa');
+            if (dataDespesa) dataDespesa.value = new Date().toISOString().split('T')[0];
+            await carregarDespesas();
+            await carregarDados();
+            setTimeout(() => {
+                if (statusMsg) {
+                    statusMsg.textContent = '';
+                    statusMsg.className = 'status-message';
+                }
+            }, 3000);
+        } else {
+            throw new Error(res.message);
+        }
+    } catch (error) {
+        console.error('Erro ao salvar despesa:', error);
+        if (statusMsg) {
+            statusMsg.textContent = "Erro ao salvar despesa: " + error.message;
+            statusMsg.className = 'status-message status-error';
+        }
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Salvar Despesa';
+        }
+    }
+}
+
+function editarDespesa(id) {
+    const despesa = todasDespesas.find(d => d.id === id);
+    if (!despesa) return;
+    
+    showSection('despesas');
+    
+    const editDespesaId = document.getElementById('editDespesaId');
+    const categoriaInput = document.getElementById('categoriaInput');
+    const descDespesa = document.getElementById('descDespesa');
+    const valorDespesa = document.getElementById('valorDespesa');
+    const dataDespesa = document.getElementById('dataDespesa');
+    const pagamentoDespesa = document.getElementById('pagamentoDespesa');
+    const statusDespesa = document.getElementById('statusDespesa');
+    const btnSalvarDespesa = document.getElementById('btnSalvarDespesa');
+    const btnCancelarDespesa = document.getElementById('btnCancelarDespesa');
+    
+    if (editDespesaId) editDespesaId.value = despesa.id;
+    if (categoriaInput) categoriaInput.value = despesa.categoria;
+    if (descDespesa) descDespesa.value = despesa.descricao || '';
+    if (valorDespesa) valorDespesa.value = despesa.valor;
+    if (dataDespesa) dataDespesa.value = converterDataParaInput(despesa.data);
+    if (pagamentoDespesa) pagamentoDespesa.value = despesa.pagamento;
+    if (statusDespesa) statusDespesa.value = despesa.status;
+    if (btnSalvarDespesa) btnSalvarDespesa.innerHTML = '<i class="fas fa-save"></i> Atualizar Despesa';
+    if (btnCancelarDespesa) btnCancelarDespesa.style.display = 'block';
+    
+    // Scroll para o formulário
+    const card = document.querySelector('#despesas .card');
+    if (card) card.scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelarEdicaoDespesa() {
+    const despesaForm = document.getElementById('despesaForm');
+    const editDespesaId = document.getElementById('editDespesaId');
+    const btnSalvarDespesa = document.getElementById('btnSalvarDespesa');
+    const btnCancelarDespesa = document.getElementById('btnCancelarDespesa');
+    const dataDespesa = document.getElementById('dataDespesa');
+    
+    if (despesaForm) despesaForm.reset();
+    if (editDespesaId) editDespesaId.value = '';
+    if (btnSalvarDespesa) btnSalvarDespesa.innerHTML = '<i class="fas fa-save"></i> Salvar Despesa';
+    if (btnCancelarDespesa) btnCancelarDespesa.style.display = 'none';
+    if (dataDespesa) dataDespesa.value = new Date().toISOString().split('T')[0];
+}
+
+async function excluirDespesa(id) {
+    if (!confirm("Tem certeza que deseja excluir esta despesa?")) return;
+    
+    const fd = new FormData();
+    fd.append('action', 'excluirDespesa');
+    fd.append('id', id);
+    
+    try {
+        await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+        await carregarDespesas();
+        await carregarDados();
+    } catch (error) {
+        console.error('Erro ao excluir despesa:', error);
+        alert("Erro ao excluir despesa!");
+    }
+}
+
+function aplicarFiltroDespesa() {
+    const dataIni = document.getElementById('despesaDataInicial').value;
+    const dataFim = document.getElementById('despesaDataFinal').value;
+    const categoria = document.getElementById('categoriaFiltro').value;
+    
+    let dadosFiltrados = [...todasDespesas];
+    
+    if (categoria) {
+        dadosFiltrados = dadosFiltrados.filter(desp => desp.categoria === categoria);
+    }
+    
+    if (dataIni && dataFim) {
+        const dIni = new Date(dataIni);
+        const dFim = new Date(dataFim);
+        dFim.setHours(23, 59, 59);
+        
+        dadosFiltrados = dadosFiltrados.filter(desp => {
+            const data = parseDataInteligente(desp.data);
+            return data && data >= dIni && data <= dFim;
+        });
+        
+        const filterDespesaDate = document.getElementById('filterDespesaDate');
+        if (filterDespesaDate) filterDespesaDate.textContent = `Filtro: ${dataIni} até ${dataFim}`;
+    } else {
+        const filterDespesaDate = document.getElementById('filterDespesaDate');
+        if (filterDespesaDate) filterDespesaDate.textContent = 'Todas as despesas';
+    }
+    
+    despesasFiltradas = dadosFiltrados;
+    paginaDespesaAtual = 1;
+    renderizarTabelaDespesas();
+}
+
+function limparFiltroDespesa() {
+    const despesaDataInicial = document.getElementById('despesaDataInicial');
+    const despesaDataFinal = document.getElementById('despesaDataFinal');
+    const categoriaFiltro = document.getElementById('categoriaFiltro');
+    
+    if (despesaDataInicial) despesaDataInicial.value = '';
+    if (despesaDataFinal) despesaDataFinal.value = '';
+    if (categoriaFiltro) categoriaFiltro.value = '';
+    
+    despesasFiltradas = [...todasDespesas];
+    paginaDespesaAtual = 1;
+    renderizarTabelaDespesas();
+    
+    const filterDespesaDate = document.getElementById('filterDespesaDate');
+    if (filterDespesaDate) filterDespesaDate.textContent = 'Todas as despesas';
+}
+
+// ==================== RELATÓRIOS ====================
+function gerarRelatoriosCompletos() {
+    if (sessionStorage.getItem('loja_logado') !== 'true') return;
+    
+    const hoje = new Date().toLocaleDateString('pt-BR');
     const mesAtual = new Date().getMonth();
     const anoAtual = new Date().getFullYear();
+    
     let totalDia = 0, totalMes = 0, totalGeral = 0;
     let descontoDia = 0, descontoMes = 0, descontoGeral = 0;
     let qtdDia = 0, qtdMes = 0, qtdGeral = 0;
     
-    dados.forEach(i => {
-        const valorBruto = parseFloat(i.valor) || 0;
-        const desconto = parseFloat(i.desconto) || 0;
+    for (const item of todosDados) {
+        const valorBruto = parseFloat(item.valor) || 0;
+        const desconto = parseFloat(item.desconto) || 0;
         const valorLiquido = valorBruto - desconto;
         
         totalGeral += valorLiquido;
         descontoGeral += desconto;
         qtdGeral++;
         
-        const d = parseDataInteligente(i.data);
-        if(d) {
-            if(d.toLocaleDateString('pt-BR') === hojeStr) {
+        const data = parseDataInteligente(item.data);
+        if (data) {
+            if (data.toLocaleDateString('pt-BR') === hoje) {
                 totalDia += valorLiquido;
                 descontoDia += desconto;
                 qtdDia++;
             }
-            if(d.getMonth() === mesAtual && d.getFullYear() === anoAtual) {
+            if (data.getMonth() === mesAtual && data.getFullYear() === anoAtual) {
                 totalMes += valorLiquido;
                 descontoMes += desconto;
                 qtdMes++;
             }
         }
-    });
+    }
     
-    const fmt = v => formatarMoeda(v);
+    let totalDespesasMes = 0;
+    let totalDespesasGeral = 0;
     
-    document.getElementById('totalDia').innerHTML = `
-        ${fmt(totalDia)} <br>
-        <small><i class="fas fa-shopping-cart"></i> ${qtdDia} venda(s)</small>
-    `;
-    document.getElementById('descontoDia').textContent = `Descontos: ${fmt(descontoDia)}`;
+    for (const desp of todasDespesas) {
+        const valor = parseFloat(desp.valor) || 0;
+        totalDespesasGeral += valor;
+        
+        const data = parseDataInteligente(desp.data);
+        if (data && data.getMonth() === mesAtual && data.getFullYear() === anoAtual) {
+            totalDespesasMes += valor;
+        }
+    }
     
-    document.getElementById('totalMes').innerHTML = `
-        ${fmt(totalMes)} <br>
-        <small><i class="fas fa-shopping-cart"></i> ${qtdMes} venda(s)</small>
-    `;
-    document.getElementById('descontoMes').textContent = `Descontos: ${fmt(descontoMes)}`;
+    const lucroMes = totalMes - totalDespesasMes;
+    const lucroGeral = totalGeral - totalDespesasGeral;
     
-    document.getElementById('totalGeral').innerHTML = `
-        ${fmt(totalGeral)} <br>
-        <small><i class="fas fa-shopping-cart"></i> ${qtdGeral} venda(s)</small>
-    `;
-    document.getElementById('descontoGeral').textContent = `Descontos: ${fmt(descontoGeral)}`;
+    const totalDiaElem = document.getElementById('totalDia');
+    const descontoDiaElem = document.getElementById('descontoDia');
+    const totalMesElem = document.getElementById('totalMes');
+    const descontoMesElem = document.getElementById('descontoMes');
+    const totalGeralElem = document.getElementById('totalGeral');
+    const descontoGeralElem = document.getElementById('descontoGeral');
+    const despesaMesElem = document.getElementById('despesaMes');
+    const lucroMesElem = document.getElementById('lucroMes');
+    const lucroGeralElem = document.getElementById('lucroGeral');
+    const lucroStatusElem = document.getElementById('lucroStatus');
+    
+    if (totalDiaElem) totalDiaElem.innerHTML = `${formatarMoeda(totalDia)}<br><small>${qtdDia} venda(s)</small>`;
+    if (descontoDiaElem) descontoDiaElem.innerHTML = `Descontos: ${formatarMoeda(descontoDia)}`;
+    if (totalMesElem) totalMesElem.innerHTML = `${formatarMoeda(totalMes)}<br><small>${qtdMes} venda(s)</small>`;
+    if (descontoMesElem) descontoMesElem.innerHTML = `Descontos: ${formatarMoeda(descontoMes)}`;
+    if (totalGeralElem) totalGeralElem.innerHTML = `${formatarMoeda(totalGeral)}<br><small>${qtdGeral} venda(s)</small>`;
+    if (descontoGeralElem) descontoGeralElem.innerHTML = `Descontos: ${formatarMoeda(descontoGeral)}`;
+    if (despesaMesElem) despesaMesElem.innerHTML = formatarMoeda(totalDespesasMes);
+    if (lucroMesElem) lucroMesElem.innerHTML = formatarMoeda(lucroMes);
+    if (lucroGeralElem) lucroGeralElem.innerHTML = formatarMoeda(lucroGeral);
+    
+    if (lucroStatusElem) {
+        if (lucroMes >= 0) {
+            lucroStatusElem.innerHTML = '💰 Lucro';
+            lucroStatusElem.style.color = '#2ec4b6';
+        } else {
+            lucroStatusElem.innerHTML = '⚠️ Prejuízo';
+            lucroStatusElem.style.color = '#e63946';
+        }
+    }
 }
 
-// --- GRÁFICOS ---
-function gerarGraficos(dados) {
-    if (sessionStorage.getItem('loja_logado') !== 'true') return;
+// ==================== GRÁFICOS ====================
+function gerarGraficosVendas(dados) {
+    const porMesLiquido = {};
+    const porMesDesconto = {};
+    const porPagamento = {};
     
-    const porMesLiquido = {}, porMesDesconto = {}, porPag = {}, valorPorPag = {};
-    
-    dados.forEach(i => {
-        const d = parseDataInteligente(i.data);
-        const valorBruto = parseFloat(i.valor) || 0;
-        const desconto = parseFloat(i.desconto) || 0;
-        const valorLiquido = valorBruto - desconto;
-        const p = i.pagamento || "Outro";
-        
-        if(d) {
-            const k = `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-            porMesLiquido[k] = (porMesLiquido[k] || 0) + valorLiquido;
-            porMesDesconto[k] = (porMesDesconto[k] || 0) + desconto;
+    for (const item of dados) {
+        const data = parseDataInteligente(item.data);
+        if (data) {
+            const mes = `${String(data.getMonth() + 1).padStart(2, '0')}/${data.getFullYear()}`;
+            const valorBruto = parseFloat(item.valor) || 0;
+            const desconto = parseFloat(item.desconto) || 0;
+            
+            porMesLiquido[mes] = (porMesLiquido[mes] || 0) + (valorBruto - desconto);
+            porMesDesconto[mes] = (porMesDesconto[mes] || 0) + desconto;
         }
-        porPag[p] = (porPag[p] || 0) + 1;
-        valorPorPag[p] = (valorPorPag[p] || 0) + valorLiquido;
-    });
+        
+        porPagamento[item.pagamento] = (porPagamento[item.pagamento] || 0) + 1;
+    }
     
     const cores = ['#4361ee', '#7209b7', '#2ec4b6', '#ff9f1c', '#e63946'];
     
-    // Destruir gráficos existentes
-    if(graficoVendas) graficoVendas.destroy();
-    if(graficoPagamento) graficoPagamento.destroy();
-    if(graficoDescontos) graficoDescontos.destroy();
-    if(graficoValorPagamento) graficoValorPagamento.destroy();
-    
-    // Gráfico de vendas líquidas por mês
-    graficoVendas = new Chart(document.getElementById('chartVendas'), {
-        type: 'line',
-        data: {
-            labels: Object.keys(porMesLiquido),
-            datasets: [{
-                label: 'Vendas Líquidas (R$)',
-                data: Object.values(porMesLiquido),
-                borderColor: '#4361ee',
-                backgroundColor: 'rgba(67, 97, 238, 0.1)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
+    const chartVendas = document.getElementById('chartVendas');
+    if (chartVendas) {
+        if (graficoVendas) graficoVendas.destroy();
+        const ctx = chartVendas.getContext('2d');
+        graficoVendas = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Object.keys(porMesLiquido),
+                datasets: [{
+                    label: 'Vendas Líquidas (R$)',
+                    data: Object.values(porMesLiquido),
+                    borderColor: '#4361ee',
+                    backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR');
-                        }
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: (v) => formatarMoeda(v) }
                     }
                 }
             }
-        }
-    });
+        });
+    }
     
-    // Gráfico de pizza (métodos de pagamento)
-    graficoPagamento = new Chart(document.getElementById('chartPagamento'), {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(porPag),
-            datasets: [{
-                data: Object.values(porPag),
-                backgroundColor: cores,
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'right',
-                }
-            }
-        }
-    });
-    
-    // Gráfico de descontos por mês
-    graficoDescontos = new Chart(document.getElementById('chartDescontos'), {
-        type: 'bar',
-        data: {
-            labels: Object.keys(porMesDesconto),
-            datasets: [{
-                label: 'Descontos (R$)',
-                data: Object.values(porMesDesconto),
-                backgroundColor: 'rgba(230, 57, 70, 0.7)',
-                borderColor: 'rgba(230, 57, 70, 1)',
-                borderWidth: 2,
-                borderRadius: 8
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    display: false
-                }
+    const chartPagamento = document.getElementById('chartPagamento');
+    if (chartPagamento) {
+        if (graficoPagamento) graficoPagamento.destroy();
+        const ctx = chartPagamento.getContext('2d');
+        graficoPagamento = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(porPagamento),
+                datasets: [{
+                    data: Object.values(porPagamento),
+                    backgroundColor: cores
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR');
-                        }
-                    }
-                }
-            }
-        }
-    });
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+    }
     
-    // NOVO GRÁFICO: Valor por método de pagamento (barra)
-    const labelsPag = Object.keys(valorPorPag);
-    const valoresPag = Object.values(valorPorPag);
-    
-    // Ordenar os métodos de pagamento em uma ordem específica
-    const ordemPagamentos = ['Dinheiro', 'Pix', 'Cartão Crédito', 'Cartão Débito', 'Outro'];
-    const labelsOrdenadas = ordemPagamentos.filter(pag => labelsPag.includes(pag));
-    const valoresOrdenados = labelsOrdenadas.map(pag => valorPorPag[pag] || 0);
-    
-    // Adicionar valores que não estão na lista padrão
-    labelsPag.forEach(pag => {
-        if (!labelsOrdenadas.includes(pag)) {
-            labelsOrdenadas.push(pag);
-            valoresOrdenados.push(valorPorPag[pag]);
-        }
-    });
-    
-    // Mapear os nomes para exibição (se necessário)
-    const labelsExibicao = labelsOrdenadas.map(pag => {
-        const map = {
-            'Dinheiro': 'Dinheiro',
-            'Pix': 'Pix',
-            'Cartão Crédito': 'Cartão Crédito',
-            'Cartão Débito': 'Cartão Débito'
-        };
-        return map[pag] || pag;
-    });
-    
-    // Cores específicas para cada método de pagamento
-    const coresPagamentos = labelsOrdenadas.map(pag => {
-        const coresMap = {
-            'Dinheiro': '#4361ee', // Azul
-            'Pix': '#7209b7', // Roxo
-            'Cartão Crédito': '#2ec4b6', // Verde
-            'Cartão Débito': '#ff9f1c' // Laranja
-        };
-        return coresMap[pag] || '#e63946'; // Vermelho para outros
-    });
-    
-    graficoValorPagamento = new Chart(document.getElementById('chartValorPagamento'), {
-        type: 'bar',
-        data: {
-            labels: labelsExibicao,
-            datasets: [{
-                label: 'Valor Total (R$)',
-                data: valoresOrdenados,
-                backgroundColor: coresPagamentos,
-                borderColor: coresPagamentos.map(cor => cor.replace('0.7', '1')),
-                borderWidth: 2,
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `Valor: ${formatarMoeda(context.parsed.y)}`;
-                        }
-                    }
-                }
+    const chartDescontos = document.getElementById('chartDescontos');
+    if (chartDescontos) {
+        if (graficoDescontos) graficoDescontos.destroy();
+        const ctx = chartDescontos.getContext('2d');
+        graficoDescontos = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(porMesDesconto),
+                datasets: [{
+                    label: 'Descontos (R$)',
+                    data: Object.values(porMesDesconto),
+                    backgroundColor: 'rgba(230, 57, 70, 0.7)',
+                    borderRadius: 8
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR');
-                        }
-                    },
-                    title: {
-                        display: true,
-                        text: 'Valor Total (R$)',
-                        font: {
-                            weight: 'bold'
-                        }
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Método de Pagamento',
-                        font: {
-                            weight: 'bold'
-                        }
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: (v) => formatarMoeda(v) }
                     }
                 }
             }
-        }
-    });
+        });
+    }
 }
 
-// --- EXPORTAÇÃO ---
-function exportarExcel() {
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        document.getElementById('loginStatus').textContent = "Faça login para exportar dados!";
-        document.getElementById('loginStatus').className = 'status-message status-error';
+function gerarGraficosDespesas() {
+    const mesAtual = new Date().getMonth();
+    const anoAtual = new Date().getFullYear();
+    
+    let totalVendas = 0;
+    for (const item of todosDados) {
+        const data = parseDataInteligente(item.data);
+        if (data && data.getMonth() === mesAtual && data.getFullYear() === anoAtual) {
+            totalVendas += (parseFloat(item.valor) || 0) - (parseFloat(item.desconto) || 0);
+        }
+    }
+    
+    let totalDespesas = 0;
+    const despesasPorMes = {};
+    
+    for (const desp of todasDespesas) {
+        const valor = parseFloat(desp.valor) || 0;
+        const data = parseDataInteligente(desp.data);
+        
+        if (data) {
+            if (data.getMonth() === mesAtual && data.getFullYear() === anoAtual) {
+                totalDespesas += valor;
+            }
+            
+            const mes = `${String(data.getMonth() + 1).padStart(2, '0')}/${data.getFullYear()}`;
+            despesasPorMes[mes] = (despesasPorMes[mes] || 0) + valor;
+        }
+    }
+    
+    const chartDespesasLucro = document.getElementById('chartDespesasLucro');
+    if (chartDespesasLucro) {
+        if (graficoDespesasLucro) graficoDespesasLucro.destroy();
+        const ctx = chartDespesasLucro.getContext('2d');
+        graficoDespesasLucro = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Vendas Líquidas', 'Despesas'],
+                datasets: [{
+                    data: [totalVendas, totalDespesas],
+                    backgroundColor: ['#2ec4b6', '#e63946']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+    }
+    
+    const chartDespesasMes = document.getElementById('chartDespesasMes');
+    if (chartDespesasMes) {
+        if (graficoDespesasMes) graficoDespesasMes.destroy();
+        const ctx = chartDespesasMes.getContext('2d');
+        graficoDespesasMes = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Object.keys(despesasPorMes),
+                datasets: [{
+                    label: 'Despesas (R$)',
+                    data: Object.values(despesasPorMes),
+                    borderColor: '#e63946',
+                    backgroundColor: 'rgba(230, 57, 70, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: (v) => formatarMoeda(v) }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function filtrarRelatorio() {
+    const dataIni = document.getElementById('dataInicialRel').value;
+    const dataFim = document.getElementById('dataFinalRel').value;
+    
+    if (!dataIni || !dataFim) {
+        alert("Selecione o período!");
         return;
     }
     
-    const inicio = (paginaAtual - 1) * itensPorPagina;
-    const fim = inicio + itensPorPagina;
-    const dadosPagina = dadosFiltradosHistorico.slice(inicio, fim);
+    const dIni = new Date(dataIni);
+    const dFim = new Date(dataFim);
+    dFim.setHours(23, 59, 59);
+    
+    const dadosFiltrados = todosDados.filter(item => {
+        const data = parseDataInteligente(item.data);
+        return data && data >= dIni && data <= dFim;
+    });
+    
+    gerarGraficosVendas(dadosFiltrados);
+    const reportDate = document.getElementById('reportDate');
+    if (reportDate) reportDate.textContent = `Período: ${dataIni} até ${dataFim}`;
+}
 
+function limparFiltroRelatorio() {
+    const hoje = new Date();
+    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+    
+    const dataInicialRel = document.getElementById('dataInicialRel');
+    const dataFinalRel = document.getElementById('dataFinalRel');
+    
+    if (dataInicialRel) dataInicialRel.value = primeiroDia.toISOString().split('T')[0];
+    if (dataFinalRel) dataFinalRel.value = ultimoDia.toISOString().split('T')[0];
+    
+    gerarGraficosVendas(todosDados);
+    const reportDate = document.getElementById('reportDate');
+    if (reportDate) reportDate.textContent = 'Período atual';
+}
+
+// ==================== EXPORTAÇÃO EXCEL ====================
+function exportarExcel() {
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const dadosPagina = dadosFiltradosHistorico.slice(inicio, inicio + itensPorPagina);
+    
     if (dadosPagina.length === 0) {
-        alert("Não há dados para exportar");
+        alert("Não há dados para exportar!");
         return;
     }
-
-    const dadosFormatados = dadosPagina.map(i => {
-        const dataLimpa = formatarDataVisual(i.data).replace(/<[^>]*>?/gm, '');
-        const valorBruto = parseFloat(i.valor) || 0;
-        const desconto = parseFloat(i.desconto) || 0;
-        const valorLiquido = valorBruto - desconto;
-        
-        return {
-            "Data": dataLimpa,
-            "Descrição": i.descricao,
-            "Valor Bruto": valorBruto,
-            "Desconto": desconto,
-            "Valor Líquido": valorLiquido,
-            "Pagamento": i.pagamento,
-            "Vendedor": i.vendedor || ''
-        };
-    });
-
+    
+    const dadosFormatados = dadosPagina.map(item => ({
+        "Data": formatarDataVisual(item.data),
+        "Descrição": item.descricao,
+        "Valor Bruto": parseFloat(item.valor) || 0,
+        "Desconto": parseFloat(item.desconto) || 0,
+        "Valor Líquido": (parseFloat(item.valor) || 0) - (parseFloat(item.desconto) || 0),
+        "Pagamento": item.pagamento,
+        "Vendedor": item.vendedor || ''
+    }));
+    
     const ws = XLSX.utils.json_to_sheet(dadosFormatados);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Vendas");
     
     const hoje = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `Vendas_${hoje}_Pagina_${paginaAtual}.xlsx`);
+    XLSX.writeFile(wb, `Vendas_${hoje}.xlsx`);
 }
 
-function exportarPDF() {
-    if (sessionStorage.getItem('loja_logado') !== 'true') {
-        document.getElementById('loginOverlay').classList.remove('hidden');
-        document.getElementById('loginStatus').textContent = "Faça login para exportar dados!";
-        document.getElementById('loginStatus').className = 'status-message status-error';
-        return;
-    }
-    
+// ==================== EXPORTAÇÃO PDF ====================
+async function exportarPDF() {
     const inicio = (paginaAtual - 1) * itensPorPagina;
-    const fim = inicio + itensPorPagina;
-    const dadosPagina = dadosFiltradosHistorico.slice(inicio, fim);
-
+    const dadosPagina = dadosFiltradosHistorico.slice(inicio, inicio + itensPorPagina);
+    
     if (dadosPagina.length === 0) {
-        alert("Não há dados para exportar");
+        alert("Não há dados para exportar!");
         return;
     }
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
     
-    const dadosPdf = dadosPagina.map(i => {
-        const valorBruto = parseFloat(i.valor) || 0;
-        const desconto = parseFloat(i.desconto) || 0;
+    if (typeof window.jspdf === 'undefined') {
+        await new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+            script.onload = resolve;
+            document.head.appendChild(script);
+        });
+        await new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js';
+            script.onload = resolve;
+            document.head.appendChild(script);
+        });
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+    
+    const dadosPdf = dadosPagina.map(item => {
+        const valorBruto = parseFloat(item.valor) || 0;
+        const desconto = parseFloat(item.desconto) || 0;
         const valorLiquido = valorBruto - desconto;
         
         return [
-            formatarDataVisual(i.data).replace(/<[^>]*>?/gm, ''),
-            i.descricao,
+            formatarDataParaRelatorio(item.data),
+            item.descricao,
             `R$ ${valorBruto.toFixed(2).replace('.', ',')}`,
             `R$ ${desconto.toFixed(2).replace('.', ',')}`,
             `R$ ${valorLiquido.toFixed(2).replace('.', ',')}`,
-            i.pagamento,
-            i.vendedor || ''
+            item.pagamento,
+            item.vendedor || '-'
         ];
     });
-
-    doc.setFontSize(16);
+    
+    let totalBruto = 0, totalDesconto = 0, totalLiquido = 0;
+    for (const item of dadosPagina) {
+        totalBruto += parseFloat(item.valor) || 0;
+        totalDesconto += parseFloat(item.desconto) || 0;
+        totalLiquido += (parseFloat(item.valor) || 0) - (parseFloat(item.desconto) || 0);
+    }
+    
+    dadosPdf.push([
+        '',
+        'TOTAL:',
+        `R$ ${totalBruto.toFixed(2).replace('.', ',')}`,
+        `R$ ${totalDesconto.toFixed(2).replace('.', ',')}`,
+        `R$ ${totalLiquido.toFixed(2).replace('.', ',')}`,
+        '',
+        ''
+    ]);
+    
+    doc.setFontSize(18);
     doc.setTextColor(67, 97, 238);
-    doc.text('Relatório de Vendas', 14, 15);
+    doc.text('Relatório de Vendas - Cortetons', 14, 15);
     
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} - Página ${paginaAtual}`, 14, 22);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 25);
+    doc.text(`Página: ${paginaAtual} de ${Math.ceil(dadosFiltradosHistorico.length / itensPorPagina)}`, 14, 32);
+    doc.text(`Total de registros: ${dadosFiltradosHistorico.length}`, 14, 39);
     
     doc.autoTable({
         head: [['Data', 'Descrição', 'Valor Bruto', 'Desconto', 'Valor Líquido', 'Pagamento', 'Vendedor']],
         body: dadosPdf,
-        startY: 30,
+        startY: 45,
         theme: 'striped',
-        headStyles: { 
-            fillColor: [26, 26, 46],
-            textColor: 255
-        },
-        margin: { top: 30 }
+        headStyles: { fillColor: [26, 26, 46], textColor: 255, fontSize: 10 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+            0: { cellWidth: 25 },
+            1: { cellWidth: 50 },
+            2: { cellWidth: 25 },
+            3: { cellWidth: 25 },
+            4: { cellWidth: 25 },
+            5: { cellWidth: 25 },
+            6: { cellWidth: 25 }
+        }
     });
     
     const hoje = new Date().toISOString().split('T')[0];
-    doc.save(`Vendas_${hoje}_Pagina_${paginaAtual}.pdf`);
+    doc.save(`Relatorio_Vendas_${hoje}_Pagina_${paginaAtual}.pdf`);
 }
 
-// --- INICIALIZAÇÃO ---
+// ==================== EXPORTAÇÃO PDF DESPESAS ====================
+async function exportarDespesasPDF() {
+    if (despesasFiltradas.length === 0) {
+        alert("Não há despesas para exportar!");
+        return;
+    }
+    
+    if (typeof window.jspdf === 'undefined') {
+        await new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+            script.onload = resolve;
+            document.head.appendChild(script);
+        });
+        await new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js';
+            script.onload = resolve;
+            document.head.appendChild(script);
+        });
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    const dadosPdf = despesasFiltradas.map(d => [
+        formatarDataDespesa(d.data),
+        d.categoria,
+        d.descricao || '-',
+        `R$ ${(parseFloat(d.valor) || 0).toFixed(2).replace('.', ',')}`,
+        d.pagamento,
+        d.status
+    ]);
+    
+    let totalDespesas = 0;
+    for (const d of despesasFiltradas) {
+        totalDespesas += parseFloat(d.valor) || 0;
+    }
+    
+    dadosPdf.push(['', '', 'TOTAL:', `R$ ${totalDespesas.toFixed(2).replace('.', ',')}`, '', '']);
+    
+    doc.setFontSize(16);
+    doc.setTextColor(67, 97, 238);
+    doc.text('Relatório de Despesas - Cortetons', 14, 15);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 22);
+    doc.text(`Total de despesas: ${despesasFiltradas.length}`, 14, 29);
+    
+    doc.autoTable({
+        head: [['Data', 'Categoria', 'Descrição', 'Valor', 'Pagamento', 'Status']],
+        body: dadosPdf,
+        startY: 35,
+        theme: 'striped',
+        headStyles: { fillColor: [26, 26, 46], textColor: 255 },
+        bodyStyles: { fontSize: 9 }
+    });
+    
+    const hoje = new Date().toISOString().split('T')[0];
+    doc.save(`Relatorio_Despesas_${hoje}.pdf`);
+}
+
+// ==================== EXPORTAÇÃO EXCEL DESPESAS ====================
+function exportarDespesasExcel() {
+    if (despesasFiltradas.length === 0) {
+        alert("Não há despesas para exportar!");
+        return;
+    }
+    
+    const dadosFormatados = despesasFiltradas.map(d => ({
+        "Data": formatarDataDespesa(d.data),
+        "Categoria": d.categoria,
+        "Descrição": d.descricao || '',
+        "Valor": parseFloat(d.valor) || 0,
+        "Pagamento": d.pagamento,
+        "Status": d.status
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(dadosFormatados);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Despesas");
+    
+    const hoje = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `Despesas_${hoje}.xlsx`);
+}
+
+// ==================== PAGINAÇÃO ====================
+const btnPaginaAnterior = document.getElementById('btnPaginaAnterior');
+const btnPaginaProxima = document.getElementById('btnPaginaProxima');
+const btnDespesaAnterior = document.getElementById('btnDespesaAnterior');
+const btnDespesaProxima = document.getElementById('btnDespesaProxima');
+
+if (btnPaginaAnterior) {
+    btnPaginaAnterior.addEventListener('click', () => {
+        const total = Math.ceil(dadosFiltradosHistorico.length / itensPorPagina);
+        if (paginaAtual > 1) {
+            paginaAtual--;
+            renderizarPagina();
+        }
+    });
+}
+
+if (btnPaginaProxima) {
+    btnPaginaProxima.addEventListener('click', () => {
+        const total = Math.ceil(dadosFiltradosHistorico.length / itensPorPagina);
+        if (paginaAtual < total) {
+            paginaAtual++;
+            renderizarPagina();
+        }
+    });
+}
+
+if (btnDespesaAnterior) {
+    btnDespesaAnterior.addEventListener('click', () => {
+        const total = Math.ceil(despesasFiltradas.length / itensDespesaPorPagina);
+        if (paginaDespesaAtual > 1) {
+            paginaDespesaAtual--;
+            renderizarTabelaDespesas();
+        }
+    });
+}
+
+if (btnDespesaProxima) {
+    btnDespesaProxima.addEventListener('click', () => {
+        const total = Math.ceil(despesasFiltradas.length / itensDespesaPorPagina);
+        if (paginaDespesaAtual < total) {
+            paginaDespesaAtual++;
+            renderizarTabelaDespesas();
+        }
+    });
+}
+
+// ==================== EVENT LISTENERS ====================
+document.querySelectorAll('.menu-btn[data-section]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const section = btn.getAttribute('data-section');
+        if (section) showSection(section);
+    });
+});
+
+document.querySelectorAll('.mobile-nav-btn[data-section]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const section = btn.getAttribute('data-section');
+        if (section) showSection(section);
+    });
+});
+
+const btnFiltrar = document.getElementById('btnFiltrar');
+const btnLimparFiltro = document.getElementById('btnLimparFiltro');
+const btnExportarExcel = document.getElementById('btnExportarExcel');
+const btnExportarPDF = document.getElementById('btnExportarPDF');
+const btnFiltrarRelatorio = document.getElementById('btnFiltrarRelatorio');
+const btnLimparRelatorio = document.getElementById('btnLimparRelatorio');
+const btnFiltrarDespesa = document.getElementById('btnFiltrarDespesa');
+const btnLimparFiltroDespesa = document.getElementById('btnLimparFiltroDespesa');
+const btnExportarDespesasExcel = document.getElementById('btnExportarDespesasExcel');
+const btnExportarDespesasPDF = document.getElementById('btnExportarDespesasPDF');
+const btnCancelar = document.getElementById('btnCancelar');
+const btnCancelarDespesa = document.getElementById('btnCancelarDespesa');
+
+if (btnFiltrar) btnFiltrar.addEventListener('click', aplicarFiltroHistorico);
+if (btnLimparFiltro) btnLimparFiltro.addEventListener('click', limparFiltroHistorico);
+if (btnExportarExcel) btnExportarExcel.addEventListener('click', exportarExcel);
+if (btnExportarPDF) btnExportarPDF.addEventListener('click', exportarPDF);
+if (btnFiltrarRelatorio) btnFiltrarRelatorio.addEventListener('click', filtrarRelatorio);
+if (btnLimparRelatorio) btnLimparRelatorio.addEventListener('click', limparFiltroRelatorio);
+if (btnFiltrarDespesa) btnFiltrarDespesa.addEventListener('click', aplicarFiltroDespesa);
+if (btnLimparFiltroDespesa) btnLimparFiltroDespesa.addEventListener('click', limparFiltroDespesa);
+if (btnExportarDespesasExcel) btnExportarDespesasExcel.addEventListener('click', exportarDespesasExcel);
+if (btnExportarDespesasPDF) btnExportarDespesasPDF.addEventListener('click', exportarDespesasPDF);
+if (btnCancelar) btnCancelar.addEventListener('click', cancelarEdicao);
+if (btnCancelarDespesa) btnCancelarDespesa.addEventListener('click', cancelarEdicaoDespesa);
+
+const valorInput = document.getElementById('valorInput');
+const descontoInput = document.getElementById('descontoInput');
+if (valorInput) valorInput.addEventListener('input', calcularValorFinal);
+if (descontoInput) descontoInput.addEventListener('input', calcularValorFinal);
+
+const buscaInput = document.getElementById('buscaInput');
+if (buscaInput) {
+    buscaInput.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+            aplicarFiltroHistorico();
+        } else {
+            filtrarPorBusca();
+        }
+    });
+}
+
+// ==================== INICIALIZAÇÃO ====================
 window.onload = () => {
     sessionStorage.clear();
-    localStorage.clear();
     
-    document.getElementById('loginOverlay').classList.remove('hidden');
-    document.getElementById('userInfo').classList.remove('active');
+    const loginOverlay = document.getElementById('loginOverlay');
+    if (loginOverlay) loginOverlay.classList.remove('hidden');
     
-    document.getElementById('loginForm').reset();
-    document.getElementById('vendaForm').reset();
+    const userInfo = document.getElementById('userInfo');
+    if (userInfo) userInfo.classList.remove('active');
     
-    document.getElementById('btnCancelar').style.display = "none";
-    
-    document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
-    document.getElementById('novaVenda').classList.add('active');
-    document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelector('.menu-btn').classList.add('active');
-    
-    document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelector('.mobile-nav-btn').classList.add('active');
-    
-    todosDados = [];
-    dadosFiltradosHistorico = [];
-    
-    // Definir datas padrão para filtros
     const hoje = new Date();
     const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
     
-    document.getElementById('dataInicialRel').value = primeiroDia.toISOString().split('T')[0];
-    document.getElementById('dataFinalRel').value = ultimoDia.toISOString().split('T')[0];
+    const dataInicialRel = document.getElementById('dataInicialRel');
+    const dataFinalRel = document.getElementById('dataFinalRel');
+    const dataDespesa = document.getElementById('dataDespesa');
+    const dataInicial = document.getElementById('dataInicial');
+    const dataFinal = document.getElementById('dataFinal');
     
-    // Definir período de 30 dias para filtro histórico
-    const data30DiasAtras = new Date();
-    data30DiasAtras.setDate(data30DiasAtras.getDate() - 30);
-    document.getElementById('dataInicial').value = data30DiasAtras.toISOString().split('T')[0];
-    document.getElementById('dataFinal').value = hoje.toISOString().split('T')[0];
+    if (dataInicialRel) dataInicialRel.value = primeiroDia.toISOString().split('T')[0];
+    if (dataFinalRel) dataFinalRel.value = ultimoDia.toISOString().split('T')[0];
+    if (dataDespesa) dataDespesa.value = hoje.toISOString().split('T')[0];
+    
+    const data30Dias = new Date();
+    data30Dias.setDate(data30Dias.getDate() - 30);
+    if (dataInicial) dataInicial.value = data30Dias.toISOString().split('T')[0];
+    if (dataFinal) dataFinal.value = hoje.toISOString().split('T')[0];
     
     atualizarDataAtual();
     calcularValorFinal();
     
-    // Responsividade
     if (window.innerWidth <= 992) {
-        document.querySelector('.sidebar').style.display = 'none';
-        document.getElementById('mobileFooter').style.display = 'block';
+        const sidebar = document.querySelector('.sidebar');
+        const mobileFooter = document.getElementById('mobileFooter');
+        if (sidebar) sidebar.style.display = 'none';
+        if (mobileFooter) mobileFooter.style.display = 'block';
     } else {
-        document.querySelector('.sidebar').style.display = 'flex';
-        document.getElementById('mobileFooter').style.display = 'none';
+        const sidebar = document.querySelector('.sidebar');
+        const mobileFooter = document.getElementById('mobileFooter');
+        if (sidebar) sidebar.style.display = 'flex';
+        if (mobileFooter) mobileFooter.style.display = 'none';
     }
     
-    window.addEventListener('resize', function() {
+    window.addEventListener('resize', () => {
         if (window.innerWidth <= 992) {
-            document.querySelector('.sidebar').style.display = 'none';
-            document.getElementById('mobileFooter').style.display = 'block';
+            const sidebar = document.querySelector('.sidebar');
+            const mobileFooter = document.getElementById('mobileFooter');
+            if (sidebar) sidebar.style.display = 'none';
+            if (mobileFooter) mobileFooter.style.display = 'block';
         } else {
-            document.querySelector('.sidebar').style.display = 'flex';
-            document.getElementById('mobileFooter').style.display = 'none';
+            const sidebar = document.querySelector('.sidebar');
+            const mobileFooter = document.getElementById('mobileFooter');
+            if (sidebar) sidebar.style.display = 'flex';
+            if (mobileFooter) mobileFooter.style.display = 'none';
         }
     });
     
     setTimeout(() => {
-        document.getElementById('loginEmail').focus();
+        const loginEmail = document.getElementById('loginEmail');
+        if (loginEmail) loginEmail.focus();
     }, 500);
 };
-
-window.addEventListener('beforeunload', function() {
-    sessionStorage.clear();
-});
