@@ -8,15 +8,20 @@ let todasDespesas = [];
 let despesasFiltradas = [];
 let paginaAtual = 1;
 let paginaDespesaAtual = 1;
-const itensPorPagina = 30;
-const itensDespesaPorPagina = 30;
+const itensPorPagina = 150;
+const itensDespesaPorPagina = 150;
 
 // Gráficos
 let graficoVendas = null;
 let graficoPagamento = null;
+let graficoPagamentoValor = null;
 let graficoDescontos = null;
 let graficoDespesasLucro = null;
 let graficoDespesasMes = null;
+
+// Dados filtrados para relatórios
+let dadosFiltradosRelatorio = [];
+let despesasFiltradasRelatorio = [];
 
 // ==================== FUNÇÕES UTILITÁRIAS ====================
 function formatarMoeda(valor) {
@@ -94,15 +99,19 @@ function parseDataInteligente(dataStr) {
     return null;
 }
 
-function converterDataParaComparacao(dataStr) {
-    if (!dataStr) return '';
-    if (dataStr.includes('/')) {
-        let partes = dataStr.split('/');
-        if (partes.length === 3) {
-            return `${partes[2]}-${partes[1]}-${partes[0]}`;
-        }
+function normalizarDataParaComparacao(dataStr) {
+    if (!dataStr) return null;
+    let data = parseDataInteligente(dataStr);
+    if (data && !isNaN(data.getTime())) {
+        return data;
     }
-    return dataStr;
+    try {
+        let d = new Date(dataStr);
+        if (!isNaN(d.getTime())) {
+            return d;
+        }
+    } catch (e) {}
+    return null;
 }
 
 function converterDataParaInput(dataStr) {
@@ -113,6 +122,23 @@ function converterDataParaInput(dataStr) {
             return `${partes[2]}-${partes[1]}-${partes[0]}`;
         }
     }
+    return dataStr;
+}
+
+function formatarDataParaExibicao(dataStr) {
+    if (!dataStr) return '';
+    try {
+        let d = new Date(dataStr + 'T00:00:00');
+        if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString('pt-BR');
+        }
+    } catch (e) {}
+    try {
+        let d = new Date(dataStr);
+        if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString('pt-BR');
+        }
+    } catch (e) {}
     return dataStr;
 }
 
@@ -151,6 +177,113 @@ function calcularValorFinal() {
         if (descontoInput) descontoInput.style.borderColor = '';
         if (valorFinalDisplay) valorFinalDisplay.style.color = '#2ec4b6';
     }
+}
+
+// ==================== FUNÇÃO PARA CALCULAR TOTAIS POR PAGAMENTO ====================
+function calcularTotaisPorPagamento(dados) {
+    const totais = {};
+    let totalGeral = 0;
+    let totalDescontos = 0;
+    
+    for (const item of dados) {
+        const valorBruto = parseFloat(item.valor) || 0;
+        const desconto = parseFloat(item.desconto) || 0;
+        const valorLiquido = valorBruto - desconto;
+        const pagamento = item.pagamento || 'Outros';
+        
+        if (!totais[pagamento]) {
+            totais[pagamento] = {
+                quantidade: 0,
+                valorBruto: 0,
+                desconto: 0,
+                valorLiquido: 0
+            };
+        }
+        
+        totais[pagamento].quantidade++;
+        totais[pagamento].valorBruto += valorBruto;
+        totais[pagamento].desconto += desconto;
+        totais[pagamento].valorLiquido += valorLiquido;
+        
+        totalGeral += valorLiquido;
+        totalDescontos += desconto;
+    }
+    
+    return { totais, totalGeral, totalDescontos };
+}
+
+// ==================== FUNÇÃO PARA RENDERIZAR RESUMO POR PAGAMENTO ====================
+function renderizarResumoPagamento(dados) {
+    const container = document.getElementById('resumoPagamentoContainer');
+    if (!container) return;
+    
+    const { totais, totalGeral, totalDescontos } = calcularTotaisPorPagamento(dados);
+    const pagamentos = Object.keys(totais);
+    
+    if (pagamentos.length === 0) {
+        container.innerHTML = `
+            <div class="resumo-vazio">
+                <i class="fas fa-info-circle"></i>
+                <span>Nenhum dado para exibir</span>
+            </div>
+        `;
+        return;
+    }
+    
+    const cores = {
+        'Dinheiro': '#2ec4b6',
+        'Pix': '#4361ee',
+        'Cartão Crédito': '#ff9f1c',
+        'Cartão Débito': '#7209b7',
+        'Outros': '#6c757d'
+    };
+    
+    let html = `
+        <div class="resumo-pagamento">
+            <div class="resumo-header">
+                <h4><i class="fas fa-chart-pie"></i> Resumo por Forma de Pagamento</h4>
+                <div class="resumo-total-geral">
+                    <span>Total Geral: <strong>${formatarMoeda(totalGeral)}</strong></span>
+                    <span style="color: #e63946; font-size: 0.85rem;">Descontos: ${formatarMoeda(totalDescontos)}</span>
+                </div>
+            </div>
+            <div class="resumo-grid">
+    `;
+    
+    const sortedPagamentos = pagamentos.sort((a, b) => totais[b].valorLiquido - totais[a].valorLiquido);
+    
+    for (const pagamento of sortedPagamentos) {
+        const data = totais[pagamento];
+        const cor = cores[pagamento] || '#6c757d';
+        const percentual = totalGeral > 0 ? ((data.valorLiquido / totalGeral) * 100).toFixed(1) : 0;
+        
+        html += `
+            <div class="resumo-item" style="border-left: 4px solid ${cor};">
+                <div class="resumo-item-header">
+                    <span class="resumo-pagamento-nome">${pagamento}</span>
+                    <span class="resumo-pagamento-qtd">${data.quantidade} venda(s)</span>
+                </div>
+                <div class="resumo-item-valores">
+                    <span class="resumo-valor-liquido">${formatarMoeda(data.valorLiquido)}</span>
+                    <span class="resumo-percentual">${percentual}%</span>
+                </div>
+                <div class="resumo-item-detalhes">
+                    <span>Bruto: ${formatarMoeda(data.valorBruto)}</span>
+                    <span style="color: #e63946;">Desc: ${formatarMoeda(data.desconto)}</span>
+                </div>
+                <div class="resumo-bar">
+                    <div class="resumo-bar-fill" style="width: ${percentual}%; background: ${cor};"></div>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
 }
 
 // ==================== NAVEGAÇÃO ====================
@@ -393,11 +526,12 @@ async function carregarDados() {
                 return dataB - dataA;
             });
             dadosFiltradosHistorico = [...todosDados];
+            dadosFiltradosRelatorio = [...todosDados];
             paginaAtual = 1;
             renderizarPagina();
-            gerarRelatoriosCompletos();
-            gerarGraficosVendas(todosDados);
-            gerarGraficosDespesas();
+            atualizarRelatorios();
+            gerarGraficosVendas(dadosFiltradosRelatorio);
+            gerarGraficosDespesas(despesasFiltradasRelatorio);
         }
     } catch (error) {
         console.error('Erro ao carregar dados:', error);
@@ -423,6 +557,8 @@ function renderizarPagina() {
     
     if (btnAnterior) btnAnterior.disabled = paginaAtual === 1;
     if (btnProxima) btnProxima.disabled = paginaAtual === totalPags;
+    
+    renderizarResumoPagamento(dadosFiltradosHistorico);
     
     if (dadosFiltradosHistorico.length === 0) {
         container.innerHTML = `
@@ -539,26 +675,42 @@ function aplicarFiltroHistorico() {
     
     let dadosFiltrados = [...todosDados];
     
+    // Filtro por busca
     if (buscaTermo) {
         dadosFiltrados = dadosFiltrados.filter(item => 
             item.descricao.toLowerCase().includes(buscaTermo)
         );
     }
     
+    // Filtro por data
     if (dataIni && dataFim) {
-        const dIni = new Date(dataIni);
-        const dFim = new Date(dataFim);
-        dFim.setHours(23, 59, 59);
+        const dIni = new Date(dataIni + 'T00:00:00');
+        const dFim = new Date(dataFim + 'T23:59:59');
         
         dadosFiltrados = dadosFiltrados.filter(item => {
-            const data = parseDataInteligente(item.data);
-            return data && data >= dIni && data <= dFim;
+            const dataItem = normalizarDataParaComparacao(item.data);
+            if (!dataItem) return false;
+            return dataItem >= dIni && dataItem <= dFim;
         });
+        
+        // Atualiza o cabeçalho com as datas selecionadas
         const filterDate = document.getElementById('filterDate');
-        if (filterDate) filterDate.textContent = `Filtro: ${dataIni} até ${dataFim}`;
+        if (filterDate) {
+            const dataIniFormatada = formatarDataParaExibicao(dataIni);
+            const dataFimFormatada = formatarDataParaExibicao(dataFim);
+            if (dataIni === dataFim) {
+                filterDate.textContent = `Filtro: ${dataIniFormatada}`;
+            } else {
+                filterDate.textContent = `Filtro: ${dataIniFormatada} até ${dataFimFormatada}`;
+            }
+            filterDate.classList.add('active-filter');
+        }
     } else {
         const filterDate = document.getElementById('filterDate');
-        if (filterDate) filterDate.textContent = 'Todos os registros';
+        if (filterDate) {
+            filterDate.textContent = 'Todos os registros';
+            filterDate.classList.remove('active-filter');
+        }
     }
     
     dadosFiltradosHistorico = dadosFiltrados;
@@ -580,34 +732,63 @@ function limparFiltroHistorico() {
     renderizarPagina();
     
     const filterDate = document.getElementById('filterDate');
-    if (filterDate) filterDate.textContent = 'Todos os registros';
+    if (filterDate) {
+        filterDate.textContent = 'Todos os registros';
+        filterDate.classList.remove('active-filter');
+    }
 }
 
 function filtrarPorBusca() {
     const buscaInput = document.getElementById('buscaInput');
     if (buscaInput) {
         const termo = buscaInput.value.toLowerCase().trim();
+        const dataIni = document.getElementById('dataInicial').value;
+        const dataFim = document.getElementById('dataFinal').value;
         
-        if (termo === '') {
-            dadosFiltradosHistorico = [...todosDados];
-        } else {
-            dadosFiltradosHistorico = todosDados.filter(item => 
+        let dadosFiltrados = [...todosDados];
+        
+        // Filtro por busca
+        if (termo) {
+            dadosFiltrados = dadosFiltrados.filter(item => 
                 item.descricao.toLowerCase().includes(termo)
             );
         }
         
-        const dataIni = document.getElementById('dataInicial').value;
-        const dataFim = document.getElementById('dataFinal').value;
-        
+        // Filtro por data
         if (dataIni && dataFim) {
-            const dIni = new Date(dataIni);
-            const dFim = new Date(dataFim);
-            dFim.setHours(23, 59, 59);
+            const dIni = new Date(dataIni + 'T00:00:00');
+            const dFim = new Date(dataFim + 'T23:59:59');
             
-            dadosFiltradosHistorico = dadosFiltradosHistorico.filter(item => {
-                const data = parseDataInteligente(item.data);
-                return data && data >= dIni && data <= dFim;
+            dadosFiltrados = dadosFiltrados.filter(item => {
+                const dataItem = normalizarDataParaComparacao(item.data);
+                if (!dataItem) return false;
+                return dataItem >= dIni && dataItem <= dFim;
             });
+        }
+        
+        dadosFiltradosHistorico = dadosFiltrados;
+        
+        // Atualiza o cabeçalho
+        const filterDate = document.getElementById('filterDate');
+        if (filterDate) {
+            if (dataIni && dataFim) {
+                const dataIniFormatada = formatarDataParaExibicao(dataIni);
+                const dataFimFormatada = formatarDataParaExibicao(dataFim);
+                if (dataIni === dataFim) {
+                    filterDate.textContent = `Filtro: ${dataIniFormatada}`;
+                } else {
+                    filterDate.textContent = `Filtro: ${dataIniFormatada} até ${dataFimFormatada}`;
+                }
+                filterDate.classList.add('active-filter');
+            } else if (termo) {
+                filterDate.textContent = `Buscando: "${termo}"`;
+                filterDate.classList.add('active-filter');
+                filterDate.style.color = '#ff9f1c';
+            } else {
+                filterDate.textContent = 'Todos os registros';
+                filterDate.classList.remove('active-filter');
+                filterDate.style.color = '';
+            }
         }
         
         paginaAtual = 1;
@@ -615,7 +796,7 @@ function filtrarPorBusca() {
     }
 }
 
-// ==================== DESPESAS (REFATORADO) ====================
+// ==================== DESPESAS ====================
 async function carregarDespesas() {
     if (sessionStorage.getItem('loja_logado') !== 'true') return;
     
@@ -636,10 +817,11 @@ async function carregarDespesas() {
                 return dataB - dataA;
             });
             despesasFiltradas = [...todasDespesas];
+            despesasFiltradasRelatorio = [...todasDespesas];
             paginaDespesaAtual = 1;
             renderizarTabelaDespesas();
-            gerarRelatoriosCompletos();
-            gerarGraficosDespesas();
+            atualizarRelatorios();
+            gerarGraficosDespesas(despesasFiltradasRelatorio);
         }
     } catch (error) {
         console.error('Erro ao carregar despesas:', error);
@@ -836,7 +1018,6 @@ function editarDespesa(id) {
     if (btnSalvarDespesa) btnSalvarDespesa.innerHTML = '<i class="fas fa-save"></i> Atualizar Despesa';
     if (btnCancelarDespesa) btnCancelarDespesa.style.display = 'block';
     
-    // Scroll para o formulário
     const card = document.querySelector('#despesas .card');
     if (card) card.scrollIntoView({ behavior: 'smooth' });
 }
@@ -884,20 +1065,31 @@ function aplicarFiltroDespesa() {
     }
     
     if (dataIni && dataFim) {
-        const dIni = new Date(dataIni);
-        const dFim = new Date(dataFim);
-        dFim.setHours(23, 59, 59);
+        const dIni = new Date(dataIni + 'T00:00:00');
+        const dFim = new Date(dataFim + 'T23:59:59');
         
         dadosFiltrados = dadosFiltrados.filter(desp => {
-            const data = parseDataInteligente(desp.data);
+            const data = normalizarDataParaComparacao(desp.data);
             return data && data >= dIni && data <= dFim;
         });
         
         const filterDespesaDate = document.getElementById('filterDespesaDate');
-        if (filterDespesaDate) filterDespesaDate.textContent = `Filtro: ${dataIni} até ${dataFim}`;
+        if (filterDespesaDate) {
+            const dataIniFormatada = formatarDataParaExibicao(dataIni);
+            const dataFimFormatada = formatarDataParaExibicao(dataFim);
+            if (dataIni === dataFim) {
+                filterDespesaDate.textContent = `Filtro: ${dataIniFormatada}`;
+            } else {
+                filterDespesaDate.textContent = `Filtro: ${dataIniFormatada} até ${dataFimFormatada}`;
+            }
+            filterDespesaDate.classList.add('active-filter');
+        }
     } else {
         const filterDespesaDate = document.getElementById('filterDespesaDate');
-        if (filterDespesaDate) filterDespesaDate.textContent = 'Todas as despesas';
+        if (filterDespesaDate) {
+            filterDespesaDate.textContent = 'Todas as despesas';
+            filterDespesaDate.classList.remove('active-filter');
+        }
     }
     
     despesasFiltradas = dadosFiltrados;
@@ -919,12 +1111,18 @@ function limparFiltroDespesa() {
     renderizarTabelaDespesas();
     
     const filterDespesaDate = document.getElementById('filterDespesaDate');
-    if (filterDespesaDate) filterDespesaDate.textContent = 'Todas as despesas';
+    if (filterDespesaDate) {
+        filterDespesaDate.textContent = 'Todas as despesas';
+        filterDespesaDate.classList.remove('active-filter');
+    }
 }
 
 // ==================== RELATÓRIOS ====================
-function gerarRelatoriosCompletos() {
+function atualizarRelatorios() {
     if (sessionStorage.getItem('loja_logado') !== 'true') return;
+    
+    const dados = dadosFiltradosRelatorio;
+    const despesas = despesasFiltradasRelatorio;
     
     const hoje = new Date().toLocaleDateString('pt-BR');
     const mesAtual = new Date().getMonth();
@@ -934,7 +1132,7 @@ function gerarRelatoriosCompletos() {
     let descontoDia = 0, descontoMes = 0, descontoGeral = 0;
     let qtdDia = 0, qtdMes = 0, qtdGeral = 0;
     
-    for (const item of todosDados) {
+    for (const item of dados) {
         const valorBruto = parseFloat(item.valor) || 0;
         const desconto = parseFloat(item.desconto) || 0;
         const valorLiquido = valorBruto - desconto;
@@ -961,7 +1159,7 @@ function gerarRelatoriosCompletos() {
     let totalDespesasMes = 0;
     let totalDespesasGeral = 0;
     
-    for (const desp of todasDespesas) {
+    for (const desp of despesas) {
         const valor = parseFloat(desp.valor) || 0;
         totalDespesasGeral += valor;
         
@@ -1011,22 +1209,26 @@ function gerarGraficosVendas(dados) {
     const porMesLiquido = {};
     const porMesDesconto = {};
     const porPagamento = {};
+    const porPagamentoValor = {};
     
     for (const item of dados) {
         const data = parseDataInteligente(item.data);
+        const valorBruto = parseFloat(item.valor) || 0;
+        const desconto = parseFloat(item.desconto) || 0;
+        const valorLiquido = valorBruto - desconto;
+        
         if (data) {
             const mes = `${String(data.getMonth() + 1).padStart(2, '0')}/${data.getFullYear()}`;
-            const valorBruto = parseFloat(item.valor) || 0;
-            const desconto = parseFloat(item.desconto) || 0;
             
-            porMesLiquido[mes] = (porMesLiquido[mes] || 0) + (valorBruto - desconto);
+            porMesLiquido[mes] = (porMesLiquido[mes] || 0) + valorLiquido;
             porMesDesconto[mes] = (porMesDesconto[mes] || 0) + desconto;
         }
         
         porPagamento[item.pagamento] = (porPagamento[item.pagamento] || 0) + 1;
+        porPagamentoValor[item.pagamento] = (porPagamentoValor[item.pagamento] || 0) + valorLiquido;
     }
     
-    const cores = ['#4361ee', '#7209b7', '#2ec4b6', '#ff9f1c', '#e63946'];
+    const cores = ['#4361ee', '#7209b7', '#2ec4b6', '#ff9f1c', '#e63946', '#4cc9f0'];
     
     const chartVendas = document.getElementById('chartVendas');
     if (chartVendas) {
@@ -1069,10 +1271,83 @@ function gerarGraficosVendas(dados) {
                 labels: Object.keys(porPagamento),
                 datasets: [{
                     data: Object.values(porPagamento),
-                    backgroundColor: cores
+                    backgroundColor: cores.slice(0, Object.keys(porPagamento).length),
+                    borderWidth: 2,
+                    borderColor: '#fff'
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: true }
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return `${context.label}: ${context.parsed} vendas (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    const chartPagamentoValor = document.getElementById('chartPagamentoValor');
+    if (chartPagamentoValor) {
+        if (graficoPagamentoValor) graficoPagamentoValor.destroy();
+        const ctx = chartPagamentoValor.getContext('2d');
+        
+        const sortedLabels = Object.keys(porPagamentoValor).sort((a, b) => porPagamentoValor[b] - porPagamentoValor[a]);
+        const sortedValues = sortedLabels.map(key => porPagamentoValor[key]);
+        
+        graficoPagamentoValor = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: sortedLabels,
+                datasets: [{
+                    label: 'Valor Total (R$)',
+                    data: sortedValues,
+                    backgroundColor: [
+                        '#4361ee', '#7209b7', '#2ec4b6', '#ff9f1c', '#e63946', '#4cc9f0'
+                    ].slice(0, sortedLabels.length),
+                    borderRadius: 8,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Total: ${formatarMoeda(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (v) => formatarMoeda(v)
+                        }
+                    }
+                }
+            }
         });
     }
     
@@ -1105,12 +1380,12 @@ function gerarGraficosVendas(dados) {
     }
 }
 
-function gerarGraficosDespesas() {
+function gerarGraficosDespesas(despesas) {
     const mesAtual = new Date().getMonth();
     const anoAtual = new Date().getFullYear();
     
     let totalVendas = 0;
-    for (const item of todosDados) {
+    for (const item of dadosFiltradosRelatorio) {
         const data = parseDataInteligente(item.data);
         if (data && data.getMonth() === mesAtual && data.getFullYear() === anoAtual) {
             totalVendas += (parseFloat(item.valor) || 0) - (parseFloat(item.desconto) || 0);
@@ -1120,7 +1395,7 @@ function gerarGraficosDespesas() {
     let totalDespesas = 0;
     const despesasPorMes = {};
     
-    for (const desp of todasDespesas) {
+    for (const desp of despesas) {
         const valor = parseFloat(desp.valor) || 0;
         const data = parseDataInteligente(desp.data);
         
@@ -1144,10 +1419,34 @@ function gerarGraficosDespesas() {
                 labels: ['Vendas Líquidas', 'Despesas'],
                 datasets: [{
                     data: [totalVendas, totalDespesas],
-                    backgroundColor: ['#2ec4b6', '#e63946']
+                    backgroundColor: ['#2ec4b6', '#e63946'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: true }
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return `${context.label}: ${formatarMoeda(context.parsed)} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
         });
     }
     
@@ -1192,21 +1491,40 @@ function filtrarRelatorio() {
         return;
     }
     
-    const dIni = new Date(dataIni);
-    const dFim = new Date(dataFim);
-    dFim.setHours(23, 59, 59);
+    const dIni = new Date(dataIni + 'T00:00:00');
+    const dFim = new Date(dataFim + 'T23:59:59');
     
-    const dadosFiltrados = todosDados.filter(item => {
-        const data = parseDataInteligente(item.data);
+    dadosFiltradosRelatorio = todosDados.filter(item => {
+        const data = normalizarDataParaComparacao(item.data);
         return data && data >= dIni && data <= dFim;
     });
     
-    gerarGraficosVendas(dadosFiltrados);
+    despesasFiltradasRelatorio = todasDespesas.filter(item => {
+        const data = normalizarDataParaComparacao(item.data);
+        return data && data >= dIni && data <= dFim;
+    });
+    
+    atualizarRelatorios();
+    gerarGraficosVendas(dadosFiltradosRelatorio);
+    gerarGraficosDespesas(despesasFiltradasRelatorio);
+    
     const reportDate = document.getElementById('reportDate');
-    if (reportDate) reportDate.textContent = `Período: ${dataIni} até ${dataFim}`;
+    if (reportDate) {
+        const dataIniFormatada = formatarDataParaExibicao(dataIni);
+        const dataFimFormatada = formatarDataParaExibicao(dataFim);
+        if (dataIni === dataFim) {
+            reportDate.textContent = `Período: ${dataIniFormatada}`;
+        } else {
+            reportDate.textContent = `Período: ${dataIniFormatada} até ${dataFimFormatada}`;
+        }
+        reportDate.classList.add('active-filter');
+    }
 }
 
 function limparFiltroRelatorio() {
+    dadosFiltradosRelatorio = [...todosDados];
+    despesasFiltradasRelatorio = [...todasDespesas];
+    
     const hoje = new Date();
     const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
@@ -1217,12 +1535,18 @@ function limparFiltroRelatorio() {
     if (dataInicialRel) dataInicialRel.value = primeiroDia.toISOString().split('T')[0];
     if (dataFinalRel) dataFinalRel.value = ultimoDia.toISOString().split('T')[0];
     
-    gerarGraficosVendas(todosDados);
+    atualizarRelatorios();
+    gerarGraficosVendas(dadosFiltradosRelatorio);
+    gerarGraficosDespesas(despesasFiltradasRelatorio);
+    
     const reportDate = document.getElementById('reportDate');
-    if (reportDate) reportDate.textContent = 'Período atual';
+    if (reportDate) {
+        reportDate.textContent = 'Período atual';
+        reportDate.classList.remove('active-filter');
+    }
 }
 
-// ==================== EXPORTAÇÃO EXCEL ====================
+// ==================== EXPORTAÇÃO ====================
 function exportarExcel() {
     const inicio = (paginaAtual - 1) * itensPorPagina;
     const dadosPagina = dadosFiltradosHistorico.slice(inicio, inicio + itensPorPagina);
@@ -1250,7 +1574,6 @@ function exportarExcel() {
     XLSX.writeFile(wb, `Vendas_${hoje}.xlsx`);
 }
 
-// ==================== EXPORTAÇÃO PDF ====================
 async function exportarPDF() {
     const inicio = (paginaAtual - 1) * itensPorPagina;
     const dadosPagina = dadosFiltradosHistorico.slice(inicio, inicio + itensPorPagina);
@@ -1343,7 +1666,6 @@ async function exportarPDF() {
     doc.save(`Relatorio_Vendas_${hoje}_Pagina_${paginaAtual}.pdf`);
 }
 
-// ==================== EXPORTAÇÃO PDF DESPESAS ====================
 async function exportarDespesasPDF() {
     if (despesasFiltradas.length === 0) {
         alert("Não há despesas para exportar!");
@@ -1406,7 +1728,6 @@ async function exportarDespesasPDF() {
     doc.save(`Relatorio_Despesas_${hoje}.pdf`);
 }
 
-// ==================== EXPORTAÇÃO EXCEL DESPESAS ====================
 function exportarDespesasExcel() {
     if (despesasFiltradas.length === 0) {
         alert("Não há despesas para exportar!");
