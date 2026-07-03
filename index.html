@@ -253,6 +253,11 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ==================== RESUMO POR FORMA DE PAGAMENTO ==================== -->
+            <div id="resumoPagamentoContainer" class="resumo-pagamento-container" style="margin: 1.5rem 0;">
+                <!-- Preenchido via JavaScript -->
+            </div>
         </div>
 
         <!-- ==================== SEÇÃO: RELATÓRIOS ==================== -->
@@ -320,8 +325,12 @@
                     <canvas id="chartVendas"></canvas>
                 </div>
                 <div class="chart-card">
-                    <h3><i class="fas fa-credit-card"></i> Formas de Pagamento</h3>
+                    <h3><i class="fas fa-credit-card"></i> Formas de Pagamento (Quantidade)</h3>
                     <canvas id="chartPagamento"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3><i class="fas fa-money-bill-wave"></i> Valores por Forma de Pagamento</h3>
+                    <canvas id="chartPagamentoValor"></canvas>
                 </div>
                 <div class="chart-card">
                     <h3><i class="fas fa-percentage"></i> Descontos por Mês</h3>
