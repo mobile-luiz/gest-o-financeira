@@ -676,6 +676,147 @@ body {
     text-align: center;
 }
 
+/* ==================== RESUMO POR FORMA DE PAGAMENTO ==================== */
+.resumo-pagamento-container {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--box-shadow);
+    margin-top: 1.5rem;
+}
+
+.resumo-pagamento {
+    width: 100%;
+}
+
+.resumo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.resumo-header h4 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.resumo-header h4 i {
+    color: var(--primary);
+}
+
+.resumo-total-geral {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.95rem;
+    color: var(--gray);
+}
+
+.resumo-total-geral strong {
+    color: var(--dark);
+}
+
+.resumo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.resumo-item {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 10px;
+    border-left: 4px solid var(--primary);
+    transition: all 0.3s ease;
+}
+
+.resumo-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--box-shadow);
+}
+
+.resumo-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.resumo-pagamento-nome {
+    font-weight: 600;
+    color: var(--dark);
+    font-size: 1rem;
+}
+
+.resumo-pagamento-qtd {
+    font-size: 0.8rem;
+    color: var(--gray);
+    background: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+}
+
+.resumo-item-valores {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+}
+
+.resumo-valor-liquido {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--success);
+}
+
+.resumo-percentual {
+    font-size: 0.85rem;
+    color: var(--gray);
+    font-weight: 500;
+}
+
+.resumo-item-detalhes {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--gray);
+    margin-bottom: 0.5rem;
+}
+
+.resumo-bar {
+    width: 100%;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+}
+
+.resumo-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+    min-width: 2px;
+}
+
+.resumo-vazio {
+    text-align: center;
+    padding: 2rem;
+    color: var(--gray);
+}
+
+.resumo-vazio i {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #ccc;
+}
+
 /* ==================== BADGES ==================== */
 .badge-pix {
     background: linear-gradient(135deg, rgba(46, 196, 182, 0.12), rgba(46, 196, 182, 0.05));
@@ -1075,6 +1216,25 @@ body {
     
     .btn-group {
         flex-direction: column;
+    }
+
+    .resumo-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .resumo-total-geral {
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.85rem;
+    }
+    
+    .resumo-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .resumo-item {
+        padding: 0.75rem;
     }
 }
 
