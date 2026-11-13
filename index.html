@@ -2,17 +2,21 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a1a2e">
     <title>Sistema de Gestão - Cortetons</title>
     
     <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     
     <!-- XLSX para exportação Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <!-- Chart.js para gráficos -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
     <!-- CSS -->
     <link rel="stylesheet" href="style.css">
@@ -21,44 +25,77 @@
 
     <!-- ==================== TELA DE LOGIN ==================== -->
     <div id="loginOverlay">
-        <div class="login-container">
-            <div class="login-card">
-                <div class="logo">
-                    <i class="fas fa-chart-line"></i>
+        <div class="login-wrap">
+            <!-- Lado da marca -->
+            <section class="login-marca">
+                <div class="login-marca-topo">
+                    <div class="login-monograma">C</div>
+                    <div>
+                        <h2>CORTETONS</h2>
+                        <span>Gestão Financeira</span>
+                    </div>
                 </div>
-                <h2>CORTETONS</h2>
-                <p>Gestão Inteligente de Vendas</p>
                 
-                <form id="loginForm">
-                    <div class="input-group">
-                        <i class="fas fa-envelope"></i>
-                        <input type="email" id="loginEmail" placeholder="E-mail" required autocomplete="email">
+                <div class="login-marca-meio">
+                    <h3>Controle suas vendas e serviços em um só lugar.</h3>
+                    <ul>
+                        <li><i class="fas fa-cash-register"></i> Registre vendas em segundos</li>
+                        <li><i class="fas fa-layer-group"></i> Veja os serviços mais executados no mês</li>
+                        <li><i class="fas fa-chart-line"></i> Acompanhe lucro, despesas e desempenho</li>
+                    </ul>
+                </div>
+                
+                <small class="login-marca-rodape">© CORTETONS · Gestão Inteligente de Vendas</small>
+            </section>
+            
+            <!-- Formulário -->
+            <section class="login-form-area">
+                <div class="login-form-box">
+                    <div class="login-mobile-marca">
+                        <div class="login-monograma">C</div>
+                        <div>
+                            <h2>CORTETONS</h2>
+                            <span>Gestão Financeira</span>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <i class="fas fa-lock"></i>
-                        <input type="password" id="loginPassword" placeholder="Senha" required autocomplete="current-password">
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block" id="btnLogin">
-                        <i class="fas fa-sign-in-alt"></i> Entrar
-                    </button>
-                </form>
-                <div id="loginStatus" class="status-message"></div>
-            </div>
+                    
+                    <h1>Bem-vindo de volta 👋</h1>
+                    <p class="login-sub">Entre com seu e-mail e senha para continuar.</p>
+                    
+                    <form id="loginForm" novalidate>
+                        <label class="login-label" for="loginEmail">E-mail</label>
+                        <div class="login-campo">
+                            <i class="far fa-envelope"></i>
+                            <input type="email" id="loginEmail" placeholder="seu@email.com" required autocomplete="email">
+                        </div>
+                        
+                        <label class="login-label" for="loginPassword">Senha</label>
+                        <div class="login-campo">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" id="loginPassword" placeholder="Digite sua senha" required autocomplete="current-password">
+                            <button type="button" class="login-olho" id="btnMostrarSenha" title="Mostrar senha" aria-label="Mostrar senha">
+                                <i class="far fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="login-caps hidden" id="avisoCaps"><i class="fas fa-triangle-exclamation"></i> Caps Lock está ativado</small>
+                        
+                        <button type="submit" class="btn btn-primary btn-block login-botao" id="btnLogin">
+                            <i class="fas fa-sign-in-alt"></i> Entrar
+                        </button>
+                    </form>
+                    <div id="loginStatus" class="status-message"></div>
+                </div>
+            </section>
         </div>
     </div>
 
     <!-- ==================== SIDEBAR ==================== -->
     <nav class="sidebar">
         <div class="brand">
-            <i class="fas fa-chart-line"></i>
-            <h1>CORTETONS</h1>
-        </div>
-        
-        <div class="user-info" id="userInfo">
-            <div class="user-avatar">
-                <i class="fas fa-user-circle"></i>
+            <div class="brand-text">
+                <h1>CORTETONS</h1>
+                <span>Gestão Financeira</span>
             </div>
-            <p class="user-email" id="userEmail"></p>
         </div>
         
         <div class="nav-menu">
@@ -73,6 +110,10 @@
             <button class="menu-btn" data-section="relatorios">
                 <i class="fas fa-chart-bar"></i>
                 <span>Relatórios</span>
+            </button>
+            <button class="menu-btn" data-section="servicos">
+                <i class="fas fa-layer-group"></i>
+                <span>Serviços</span>
             </button>
             <button class="menu-btn" data-section="despesas">
                 <i class="fas fa-receipt"></i>
@@ -101,6 +142,10 @@
                 <i class="fas fa-chart-bar"></i>
                 <span>Rel.</span>
             </button>
+            <button class="mobile-nav-btn" data-section="servicos">
+                <i class="fas fa-layer-group"></i>
+                <span>Serv.</span>
+            </button>
             <button class="mobile-nav-btn" data-section="despesas">
                 <i class="fas fa-receipt"></i>
                 <span>Desp.</span>
@@ -111,45 +156,120 @@
     <!-- ==================== CONTEÚDO PRINCIPAL ==================== -->
     <main class="main-content">
         
+        <!-- ==================== BARRA SUPERIOR ==================== -->
+        <header class="topbar">
+            <div class="topbar-acoes">
+                <div class="topbar-item">
+                    <button type="button" class="topbar-sino" id="btnNotificacoes" title="Notificações">
+                        <i class="far fa-bell"></i>
+                        <span class="sino-ponto hidden" id="sinoPonto"></span>
+                    </button>
+                    <div class="topbar-dropdown notif-dropdown hidden" id="notifDropdown">
+                        <h4><i class="fas fa-bell"></i> Despesas pendentes</h4>
+                        <div id="notifLista"></div>
+                    </div>
+                </div>
+                <div class="topbar-item user-menu" id="userInfo">
+                    <button type="button" class="user-chip" id="userChip">
+                        <span class="user-avatar" id="userAvatar">U</span>
+                        <span class="user-email" id="userEmail"></span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="topbar-dropdown user-dropdown hidden" id="userDropdown">
+                        <button type="button" id="btnSairMenu"><i class="fas fa-sign-out-alt"></i> Sair</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
         <!-- ==================== SEÇÃO: NOVA VENDA ==================== -->
         <div id="novaVenda" class="section active">
             <div class="page-header">
-                <h1><i class="fas fa-cash-register"></i> Nova Venda</h1>
-                <div class="date-indicator" id="currentDate"></div>
+                <div class="page-title">
+                    <div class="page-icon"><i class="fas fa-cart-shopping"></i></div>
+                    <div>
+                        <h1>Nova Venda</h1>
+                        <p>Registre uma nova venda de forma rápida e organizada.</p>
+                    </div>
+                </div>
             </div>
             
-            <div class="card">
+            <div class="venda-grid">
+            <div class="card card-venda">
                 <form id="vendaForm">
                     <input type="hidden" id="editId">
                     
                     <div class="form-group">
-                        <label><i class="fas fa-tag"></i> Descrição do Produto/Serviço</label>
-                        <input type="text" id="descInput" class="form-control" required placeholder="Ex: Corte de cabelo">
+                        <label><i class="far fa-clock"></i> Data e horário da venda <span class="obrigatorio">*</span></label>
+                        <div class="data-hora-venda">
+                            <div class="campo-icone">
+                                <i class="far fa-calendar"></i>
+                                <input type="date" id="dataVendaInput" class="form-control" required>
+                            </div>
+                            <div class="campo-icone">
+                                <i class="far fa-clock"></i>
+                                <input type="time" id="horaVendaInput" class="form-control" required>
+                            </div>
+                            <button type="button" class="btn-agora" id="btnAgora" title="Voltar para a data e hora atual">
+                                <i class="fas fa-rotate-right"></i> Agora
+                            </button>
+                        </div>
+                        <small class="tipo-dica" id="dataVendaDica">Preenchido automaticamente com a data e hora atual — altere se a venda foi em outro momento.</small>
                     </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Descrição do Produto/Serviço <span class="obrigatorio">*</span></label>
+                        <input type="text" id="descInput" class="form-control" required placeholder="Ex: Corte de cabelo, hidratação, coloração...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-layer-group"></i> Tipo de Serviço <span class="obrigatorio">*</span></label>
+                        <div class="chip-group" data-target="tipoServicoInput">
+                            <button type="button" class="chip" data-value="Roupas"><i class="fas fa-tshirt"></i> Roupas</button>
+                            <button type="button" class="chip" data-value="Serviços de Salão"><i class="fas fa-scissors"></i> Serviços de Salão</button>
+                        </div>
+                        <select id="tipoServicoInput" class="select-oculto" tabindex="-1" aria-hidden="true">
+                            <option value="">Selecione...</option>
+                            <option value="Roupas">Roupas</option>
+                            <option value="Serviços de Salão">Serviços de Salão</option>
+                        </select>
+                        <small class="tipo-dica">Marcado automaticamente pela descrição — clique para trocar se precisar.</small>
+                    </div>
+                    
                     
                     <div class="form-row">
                         <div class="form-col">
                             <div class="form-group">
-                                <label><i class="fas fa-money-bill-wave"></i> Valor (R$)</label>
-                                <input type="number" id="valorInput" class="form-control" step="0.01" required placeholder="0,00" min="0" value="0">
+                                <label><i class="fas fa-money-bill-wave"></i> Valor (R$) <span class="obrigatorio">*</span></label>
+                                <input type="number" id="valorInput" class="form-control" step="0.01" required placeholder="0,00" min="0" inputmode="decimal">
                             </div>
                         </div>
                         <div class="form-col">
                             <div class="form-group">
                                 <label><i class="fas fa-percentage"></i> Desconto (R$)</label>
-                                <input type="number" id="descontoInput" class="form-control" step="0.01" placeholder="0,00" min="0" value="0">
+                                <input type="number" id="descontoInput" class="form-control" step="0.01" placeholder="0,00" min="0" inputmode="decimal">
                             </div>
                         </div>
                     </div>
                     
                     <div class="valor-display">
-                        <h4>VALOR FINAL</h4>
-                        <p id="valorFinalDisplay">R$ 0,00</p>
+                        <i class="fas fa-coins"></i>
+                        <div>
+                            <h4>VALOR FINAL</h4>
+                            <p id="valorFinalDisplay">R$ 0,00</p>
+                        </div>
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-credit-card"></i> Forma de Pagamento</label>
-                        <select id="pagInput" class="form-control" required>
+                        <label><i class="fas fa-credit-card"></i> Forma de Pagamento <span class="obrigatorio">*</span></label>
+                        <div class="chip-group chip-group-pag" data-target="pagInput">
+                            <button type="button" class="chip" data-value="Pix"><i class="fa-brands fa-pix"></i> Pix</button>
+                            <button type="button" class="chip" data-value="Dinheiro"><i class="fas fa-money-bill-wave"></i> Dinheiro</button>
+                            <button type="button" class="chip" data-value="Cartão Crédito"><i class="fas fa-credit-card"></i> Crédito</button>
+                            <button type="button" class="chip" data-value="Cartão Débito"><i class="far fa-credit-card"></i> Débito</button>
+                            <button type="button" class="chip" data-value="Outros"><i class="fas fa-ellipsis"></i> Outros</button>
+                        </div>
+                        <select id="pagInput" class="select-oculto" tabindex="-1" aria-hidden="true">
                             <option value="">Selecione...</option>
                             <option value="Dinheiro">Dinheiro</option>
                             <option value="Pix">Pix</option>
@@ -170,12 +290,59 @@
                     <div id="status" class="status-message"></div>
                 </form>
             </div>
+            
+            <!-- Coluna lateral -->
+            <aside class="venda-lateral">
+                <div class="side-card">
+                    <div class="side-card-header">
+                        <h3><span class="side-icon"><i class="fas fa-chart-simple"></i></span> Resumo do Dia</h3>
+                        <i class="fas fa-circle-info side-info" title="Vendas registradas hoje"></i>
+                    </div>
+                    <ul class="resumo-dia">
+                        <li><span><i class="far fa-clock"></i> Vendas hoje</span><strong class="verde" id="resumoHojeValor">R$ 0,00</strong></li>
+                        <li><span><i class="fas fa-cube"></i> Quantidade de vendas</span><strong class="verde" id="resumoHojeQtd">0</strong></li>
+                        <li><span><i class="fas fa-ticket"></i> Descontos concedidos</span><strong class="vermelho" id="resumoHojeDesc">R$ 0,00</strong></li>
+                        <li><span><i class="fas fa-tag"></i> Ticket médio</span><strong class="verde" id="resumoHojeTicket">R$ 0,00</strong></li>
+                    </ul>
+                </div>
+                
+                <div class="side-card">
+                    <div class="side-card-header">
+                        <h3><span class="side-icon"><i class="fas fa-chart-line"></i></span> Desempenho (Mês)</h3>
+                    </div>
+                    <div class="desempenho-topo">
+                        <div>
+                            <p class="desempenho-valor" id="desempenhoMes">R$ 0,00</p>
+                            <small>Total em vendas no mês atual</small>
+                        </div>
+                        <div class="desempenho-comp">
+                            <span class="desempenho-var" id="desempenhoVar" title="Comparado ao mesmo período do mês passado"><i class="fas fa-arrow-up"></i> 0%</span>
+                            <small>vs. mês anterior</small>
+                        </div>
+                    </div>
+                    <div class="desempenho-legenda">
+                        <span><i class="leg-barra"></i> Vendas por dia</span>
+                        <span><i class="leg-linha"></i> Acumulado no mês</span>
+                    </div>
+                    <div class="desempenho-grafico">
+                        <canvas id="chartDesempenho"></canvas>
+                    </div>
+                    <div class="desempenho-info" id="desempenhoInfo"></div>
+                </div>
+            </aside>
+            </div>
         </div>
 
         <!-- ==================== SEÇÃO: HISTÓRICO DE VENDAS ==================== -->
         <div id="lancamentos" class="section">
             <div class="page-header">
-                <h1><i class="fas fa-history"></i> Histórico de Vendas</h1>
+                <div class="page-title">
+                    <div class="page-icon"><i class="fas fa-clock-rotate-left"></i></div>
+                    <div>
+                        <h1>Histórico de Vendas</h1>
+                        <p>Consulte, filtre e exporte as vendas registradas.</p>
+                    </div>
+                </div>
                 <div class="date-indicator" id="filterDate">Todos os registros</div>
             </div>
             
@@ -191,11 +358,30 @@
                             <i class="fas fa-calendar-check"></i>
                             <input type="date" id="dataFinal" class="filter-input" placeholder="Data final">
                         </div>
-                        <div class="filter-item">
+                        <div class="filter-item filter-busca">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="buscaInput" class="filter-input" placeholder="Buscar descrição...">
+                            <input type="search" id="buscaInput" class="filter-input" placeholder="Buscar descrição, pagamento..." autocomplete="off">
                         </div>
-                        <button class="btn btn-primary btn-sm" id="btnFiltrar">
+                        <div class="filter-item">
+                            <i class="fas fa-layer-group"></i>
+                            <select id="filtroTipo" class="filter-input">
+                                <option value="">Todos os tipos</option>
+                                <option value="Roupas">Roupas</option>
+                                <option value="Serviços de Salão">Serviços de Salão</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <i class="fas fa-credit-card"></i>
+                            <select id="filtroPagamento" class="filter-input">
+                                <option value="">Todos os pagamentos</option>
+                                <option value="Pix">Pix</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                                <option value="Cartão Crédito">Cartão Crédito</option>
+                                <option value="Cartão Débito">Cartão Débito</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btnFiltrar" hidden>
                             <i class="fas fa-filter"></i> Filtrar
                         </button>
                         <button class="btn btn-secondary btn-sm" id="btnLimparFiltro">
@@ -220,6 +406,7 @@
                             <tr>
                                 <th>Data/Hora</th>
                                 <th>Descrição</th>
+                                <th>Tipo</th>
                                 <th>Valor Bruto</th>
                                 <th>Desconto</th>
                                 <th>Valor Líquido</th>
@@ -263,7 +450,13 @@
         <!-- ==================== SEÇÃO: RELATÓRIOS ==================== -->
         <div id="relatorios" class="section">
             <div class="page-header">
-                <h1><i class="fas fa-chart-bar"></i> Dashboard</h1>
+                <div class="page-title">
+                    <div class="page-icon"><i class="fas fa-chart-column"></i></div>
+                    <div>
+                        <h1>Dashboard</h1>
+                        <p>Acompanhe o desempenho do seu negócio.</p>
+                    </div>
+                </div>
                 <div class="date-indicator" id="reportDate">Período atual</div>
             </div>
             
@@ -322,35 +515,85 @@
             <div class="charts-grid">
                 <div class="chart-card">
                     <h3><i class="fas fa-chart-line"></i> Vendas Líquidas no Período</h3>
-                    <canvas id="chartVendas"></canvas>
+                    <div class="chart-area"><canvas id="chartVendas"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3><i class="fas fa-calendar-week"></i> Vendas por Dia da Semana</h3>
+                    <div class="chart-area chart-area-semana"><canvas id="chartDiaSemana"></canvas></div>
+                    <div class="semana-info" id="semanaInfo"></div>
                 </div>
                 <div class="chart-card">
                     <h3><i class="fas fa-credit-card"></i> Formas de Pagamento (Quantidade)</h3>
-                    <canvas id="chartPagamento"></canvas>
+                    <div class="chart-area"><canvas id="chartPagamento"></canvas></div>
                 </div>
                 <div class="chart-card">
                     <h3><i class="fas fa-money-bill-wave"></i> Valores por Forma de Pagamento</h3>
-                    <canvas id="chartPagamentoValor"></canvas>
+                    <div class="chart-area"><canvas id="chartPagamentoValor"></canvas></div>
                 </div>
                 <div class="chart-card">
                     <h3><i class="fas fa-percentage"></i> Descontos por Mês</h3>
-                    <canvas id="chartDescontos"></canvas>
+                    <div class="chart-area"><canvas id="chartDescontos"></canvas></div>
                 </div>
                 <div class="chart-card">
                     <h3><i class="fas fa-chart-pie"></i> Despesas vs Lucro (Mês)</h3>
-                    <canvas id="chartDespesasLucro"></canvas>
+                    <div class="chart-area"><canvas id="chartDespesasLucro"></canvas></div>
                 </div>
                 <div class="chart-card">
                     <h3><i class="fas fa-chart-line"></i> Despesas por Mês</h3>
-                    <canvas id="chartDespesasMes"></canvas>
+                    <div class="chart-area"><canvas id="chartDespesasMes"></canvas></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ==================== SEÇÃO: SERVIÇOS ==================== -->
+        <div id="servicos" class="section">
+            <div class="page-header">
+                <div class="page-title">
+                    <div class="page-icon"><i class="fas fa-layer-group"></i></div>
+                    <div>
+                        <h1>Serviços</h1>
+                        <p>Veja as quantidades de Roupas e Serviços de Salão executados no mês.</p>
+                    </div>
+                </div>
+                <label class="date-indicator mes-seletor" for="mesServicos">
+                    <i class="far fa-calendar"></i>
+                    <input type="month" id="mesServicos" aria-label="Mês">
+                </label>
+            </div>
+            
+            <div class="servicos-total" id="servicosTotal">
+                <!-- Preenchido via JavaScript -->
+            </div>
+            
+            <div class="servicos-kpis" id="servicosKpis">
+                <!-- Preenchido via JavaScript -->
+            </div>
+            
+            <div class="servicos-mes-card">
+                <div class="servicos-mes-header">
+                    <h3><i class="fas fa-ranking-star"></i> Mais executados no mês</h3>
+                </div>
+                <div class="servicos-ranking-grid" id="servicosRanking">
+                    <!-- Preenchido via JavaScript -->
+                </div>
+            </div>
+            
+            <div class="chart-card servicos-grafico">
+                <h3><i class="fas fa-chart-column"></i> Quantidade de Serviços por Mês</h3>
+                <div class="chart-area"><canvas id="chartServicos"></canvas></div>
             </div>
         </div>
 
         <!-- ==================== SEÇÃO: DESPESAS ==================== -->
         <div id="despesas" class="section">
             <div class="page-header">
-                <h1><i class="fas fa-receipt"></i> Gestão de Despesas</h1>
+                <div class="page-title">
+                    <div class="page-icon"><i class="fas fa-receipt"></i></div>
+                    <div>
+                        <h1>Gestão de Despesas</h1>
+                        <p>Controle os gastos e as contas da loja.</p>
+                    </div>
+                </div>
                 <div class="date-indicator" id="filterDespesaDate">Todas as despesas</div>
             </div>
             
@@ -533,7 +776,24 @@
         </div>
     </main>
     
+    <!-- Notificações -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+    
+    <!-- Modal de confirmação -->
+    <div id="confirmModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-box">
+            <div class="modal-icone"><i class="fas fa-triangle-exclamation"></i></div>
+            <h3 id="confirmTitulo">Confirmar</h3>
+            <p id="confirmMensagem"></p>
+            <div class="modal-acoes">
+                <button type="button" class="btn btn-secondary" id="confirmCancelar">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmOk"><i class="fas fa-trash-alt"></i> Excluir</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- JavaScript -->
     <script src="script.js"></script>
 </body>
 </html>
+
